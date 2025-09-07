@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamDrive - Video Cloud Storage</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <i class="fas fa-video"></i>
+            <span>StreamDrive</span>
+        </div>
+        <button class="upload-btn" onclick="openUploadModal()">
+            <i class="fas fa-plus"></i>
+            Upload Video
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Backup Status Bar -->
+        <div class="backup-status-bar">
+            <div class="backup-info">
+                <i class="fas fa-cloud"></i>
+                <span>Telegram Backup: </span>
+                <span class="status connected" id="backupStatus">Connected</span>
+            </div>
+            <button class="sync-btn" onclick="syncBackup()" id="syncBtn">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+
+        <!-- Videos Grid -->
+        <div class="videos-grid" id="videosGrid">
+            <div class="loading" id="loadingSpinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                Loading videos...
+            </div>
+        </div>
+    </main>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-content">
+            <div class="upload-header">
+                <h2>Upload Video</h2>
+                <button class="close-btn" onclick="closeUploadModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>Drop your video here</h3>
+                <p>or click to browse</p>
+                <input type="file" id="fileInput" accept="video/*" style="display: none;">
+            </div>
+            
+            <div class="upload-progress" id="uploadProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Uploading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="player-modal" id="playerModal">
+        <div class="player-content">
+            <div class="player-header">
+                <h3 id="playerTitle">Video Player</h3>
+                <button class="close-btn" onclick="closePlayer()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <video id="videoPlayer" controls>
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="rename-modal" id="renameModal">
+        <div class="rename-content">
+            <div class="rename-header">
+                <h2>Rename Video</h2>
+                <button class="close-btn" onclick="closeRenameModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="rename-body">
+                <label for="newVideoName">Enter new name:</label>
+                <input type="text" id="newVideoName" placeholder="Video name" maxlength="255">
+                <div class="rename-actions">
+                    <button class="btn btn-secondary" onclick="closeRenameModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="app.renameVideo()">Rename</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="delete-modal" id="deleteModal">
+        <div class="delete-content">
+            <div class="delete-header">
+                <h2>Delete Video</h2>
+                <button class="close-btn" onclick="closeDeleteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="delete-body">
+                <div class="warning-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Are you sure?</h3>
+                <p>This will permanently delete "<span id="deleteVideoName"></span>" from your storage and Telegram backup.</p>
+                <div class="delete-actions">
+                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="btn btn-danger" onclick="app.deleteVideo()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="script.js"></script>
+</body>
+</html>
