@@ -9,6 +9,7 @@ require('dotenv').config();
 const TelegramService = require('./services/telegramService');
 const VideoProcessor = require('./services/videoProcessor');
 const DatabaseService = require('./services/databaseService');
+const CloudStreamingService = require('./services/cloudStreamingService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,11 +18,10 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/hls', express.static('hls'));
 
-// Ensure directories exist
+// Ensure directories exist (removed hls directory)
 const ensureDirectories = async () => {
-    const dirs = ['uploads', 'hls', 'temp', 'data'];
+    const dirs = ['uploads', 'temp', 'data'];
     for (const dir of dirs) {
         await fs.ensureDir(dir);
     }
@@ -57,6 +57,7 @@ const upload = multer({
 const telegramService = new TelegramService();
 const videoProcessor = new VideoProcessor();
 const databaseService = new DatabaseService();
+const cloudStreamingService = new CloudStreamingService();
 
 // Routes
 app.get('/', (req, res) => {
@@ -65,6 +66,8 @@ app.get('/', (req, res) => {
 
 // Upload video endpoint
 app.post('/api/upload', upload.single('video'), async (req, res) => {
+    const startTime = Date.now();
+    
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No video file uploaded' });
@@ -76,37 +79,96 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
         console.log(`Processing video: ${originalName}`);
 
-        // Get video metadata
-        const metadata = await videoProcessor.getVideoMetadata(videoPath);
-        
-        // Process video to HLS format
-        const hlsPath = await videoProcessor.convertToHLS(videoPath, videoId, metadata);
+        // Start upload immediately without waiting for metadata
+        console.log('Uploading to Telegram cloud storage...');
+        const uploadStartTime = Date.now();
+        const uploadPromise = telegramService.uploadVideo(videoPath, originalName, videoId);
 
-        // Upload to Telegram
-        const telegramData = await telegramService.uploadVideo(videoPath, originalName, videoId);
+        // Get basic metadata in parallel (lightweight operation)
+        const basicMetadataPromise = videoProcessor.getBasicMetadata(videoPath);
 
-        // Save to database
+        // Wait for upload to complete first (priority)
+        const telegramData = await uploadPromise;
+        const uploadTime = Date.now() - uploadStartTime;
+        console.log(`Upload completed in ${uploadTime}ms`);
+
+        // Get basic metadata
+        const metadata = await basicMetadataPromise;
+
+        // Save to database immediately with basic data
         const videoData = {
             id: videoId,
             originalName: originalName,
             metadata: metadata,
-            hlsPath: hlsPath,
             telegramData: telegramData,
+            cloudThumbnail: null, // Will be generated in background
             uploadDate: new Date().toISOString(),
-            size: req.file.size
+            size: req.file.size,
+            viewCount: 0,
+            favorite: false,
+            tags: [],
+            category: null,
+            shareLinks: [],
+            streamingMethod: 'cloud',
+            uploadTime: uploadTime // Track upload performance
         };
 
         await databaseService.saveVideo(videoData);
 
-        // Clean up original file
-        await fs.remove(videoPath);
+        // Start background tasks (don't wait for them) - but keep file until background tasks complete
+        setImmediate(async () => {
+            try {
+                // Generate thumbnail in background (this needs the file temporarily)
+                let cloudThumbnail = null;
+                try {
+                    console.log('Attempting thumbnail generation...');
+                    cloudThumbnail = await cloudStreamingService.generateThumbnailFromTelegram(telegramData, videoId);
+                    if (cloudThumbnail) {
+                        console.log('Thumbnail generated successfully');
+                    } else {
+                        console.log('Thumbnail generation skipped or failed - using placeholder');
+                    }
+                } catch (error) {
+                    console.log('Thumbnail generation error (non-critical):', error.message.split('\n')[0]);
+                    // Continue without thumbnail - not a critical error
+                }
 
+                // Update database with enhanced data
+                if (cloudThumbnail) {
+                    await databaseService.updateVideoMetadata(videoId, {
+                        cloudThumbnail: cloudThumbnail
+                    });
+                }
+
+                // Clean up original file after all processing is complete
+                console.log(`Cleaning up local file: ${videoPath}`);
+                await fs.remove(videoPath).catch(err => console.warn('Failed to cleanup file:', err));
+                
+            } catch (error) {
+                console.warn('Background processing failed:', error.message);
+                // Still clean up the file even if background processing fails
+                await fs.remove(videoPath).catch(err => console.warn('Failed to cleanup file:', err));
+            }
+        });
+
+        const totalTime = Date.now() - startTime;
+        console.log(`Total request processed in ${totalTime}ms (Upload: ${uploadTime}ms)`);
+
+        // Return response immediately
         res.json({
             success: true,
             videoId: videoId,
-            message: 'Video uploaded and processed successfully',
+            message: 'Video uploaded to cloud storage successfully',
             streamUrl: `/api/stream/${videoId}`,
-            metadata: metadata
+            cloudStreamUrl: `/api/cloud-stream/${videoId}`,
+            thumbnailUrl: `/api/thumbnail/${videoId}`, // Will be available once generated
+            metadata: metadata,
+            streamingMethod: 'cloud',
+            processing: true, // Indicates background processing is ongoing
+            performance: {
+                uploadTime: uploadTime,
+                totalTime: totalTime
+            }
         });
 
     } catch (error) {
@@ -158,8 +220,80 @@ app.get('/api/video/:id', async (req, res) => {
     }
 });
 
-// Stream video endpoint - serve playlist
+// Direct cloud streaming endpoint
 app.get('/api/stream/:id', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        console.log(`Stream request for video ID: ${videoId}`);
+        const video = await databaseService.getVideo(videoId);
+        
+        if (!video) {
+            console.log(`Video not found: ${videoId}`);
+            return res.status(404).json({ error: 'Video not found' });
+        }
+
+        if (!video.telegramData?.uploaded) {
+            console.log(`Video not uploaded to Telegram: ${videoId}`);
+            return res.status(404).json({ error: 'Video not available for streaming' });
+        }
+
+        console.log(`Video found: ${video.originalName}, Telegram data:`, video.telegramData);
+
+        // Increment view count
+        await databaseService.incrementViewCount(videoId);
+
+        // Parse range header for partial content requests
+        const range = req.headers.range;
+        console.log(`Range header: ${range}`);
+        
+        // Stream video directly from Telegram
+        const streamData = await cloudStreamingService.streamVideo(video.telegramData, range, video.originalName);
+        console.log(`Stream data obtained, content length: ${streamData.contentLength}`);
+        
+        // Set appropriate headers for browser video playback
+        res.setHeader('Content-Type', streamData.contentType);
+        res.setHeader('Accept-Ranges', streamData.acceptsRanges ? 'bytes' : 'none');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Range');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(video.originalName)}"`);
+        
+        // Handle range requests
+        if (range && streamData.acceptsRanges) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : streamData.contentLength - 1;
+            const chunkSize = (end - start) + 1;
+            
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${end}/${streamData.contentLength}`);
+            res.setHeader('Content-Length', chunkSize);
+        } else if (!range) {
+            // No range request, send full content
+            res.setHeader('Content-Length', streamData.contentLength);
+        }
+        
+        // Pipe the stream to response
+        streamData.stream.pipe(res);
+        
+        streamData.stream.on('error', (error) => {
+            console.error('Streaming error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Streaming failed' });
+            }
+        });
+        
+    } catch (error) {
+        console.error('Stream error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Cloud streaming endpoint with better range support
+app.get('/api/cloud-stream/:id', async (req, res) => {
     try {
         const videoId = req.params.id;
         const video = await databaseService.getVideo(videoId);
@@ -168,57 +302,51 @@ app.get('/api/stream/:id', async (req, res) => {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        const m3u8Path = path.join(__dirname, 'hls', videoId, 'playlist.m3u8');
-        
-        if (await fs.pathExists(m3u8Path)) {
-            // Read the playlist and modify segment paths to be absolute
-            let playlistContent = await fs.readFile(m3u8Path, 'utf8');
-            
-            // Replace relative segment paths with absolute URLs
-            playlistContent = playlistContent.replace(
-                /segment_(\d+)\.ts/g, 
-                `/api/stream/${videoId}/segment_$1.ts`
-            );
-            
-            res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.send(playlistContent);
-        } else {
-            res.status(404).json({ error: 'Stream not available' });
+        if (!video.telegramData?.uploaded) {
+            return res.status(404).json({ error: 'Video not available for streaming' });
         }
+
+        // Get stream info
+        const streamInfo = await cloudStreamingService.getVideoStreamInfo(video.telegramData);
+        
+        // Stream the video with proper headers
+        const streamData = await cloudStreamingService.streamVideo(video.telegramData, req.headers.range, video.originalName);
+        
+        // Set video-specific headers
+        res.setHeader('Content-Type', streamData.contentType);
+        res.setHeader('Content-Length', streamInfo.size);
+        res.setHeader('Accept-Ranges', streamInfo.supportsRangeRequests ? 'bytes' : 'none');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Range');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(video.originalName)}"`);        
+
+        streamData.stream.pipe(res);
+        
     } catch (error) {
-        console.error('Stream error:', error);
+        console.error('Cloud stream error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Stream video segments
-app.get('/api/stream/:id/:segment', async (req, res) => {
+// Serve cloud-generated thumbnails
+app.get('/api/thumbnail/:id', async (req, res) => {
     try {
         const videoId = req.params.id;
-        const segment = req.params.segment;
-        
-        // Validate segment filename
-        if (!/^segment_\d+\.ts$/.test(segment)) {
-            return res.status(404).json({ error: 'Invalid segment' });
-        }
-        
         const video = await databaseService.getVideo(videoId);
-        if (!video) {
-            return res.status(404).json({ error: 'Video not found' });
-        }
-
-        const segmentPath = path.join(__dirname, 'hls', videoId, segment);
         
-        if (await fs.pathExists(segmentPath)) {
-            res.setHeader('Content-Type', 'video/mp2t');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.sendFile(segmentPath);
-        } else {
-            res.status(404).json({ error: 'Segment not found' });
+        if (!video || !video.cloudThumbnail) {
+            return res.status(404).json({ error: 'Thumbnail not found' });
         }
+        
+        res.setHeader('Content-Type', video.cloudThumbnail.contentType);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 hours
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.send(video.cloudThumbnail.data);
+        
     } catch (error) {
-        console.error('Segment error:', error);
+        console.error('Thumbnail error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -259,10 +387,15 @@ app.delete('/api/video/:id', async (req, res) => {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        // Delete HLS files
-        const hlsDir = path.join(__dirname, 'hls', videoId);
-        if (await fs.pathExists(hlsDir)) {
-            await fs.remove(hlsDir);
+        // Delete from Telegram (optional - videos remain in cloud for redundancy)
+        try {
+            if (video.telegramData?.uploaded) {
+                console.log(`Video deleted from database. Telegram backup remains for recovery.`);
+                // Uncomment the line below to also delete from Telegram
+                // await telegramService.deleteVideo(video.telegramData);
+            }
+        } catch (error) {
+            console.warn('Failed to delete from Telegram:', error.message);
         }
 
         // Delete from database
@@ -275,15 +408,290 @@ app.delete('/api/video/:id', async (req, res) => {
     }
 });
 
+// Enhanced video management endpoints
+
+// Add tags to video
+app.post('/api/video/:id/tags', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        const { tags } = req.body;
+        
+        if (!tags || !Array.isArray(tags)) {
+            return res.status(400).json({ error: 'Tags must be an array' });
+        }
+        
+        const updatedTags = await databaseService.addVideoTags(videoId, tags);
+        res.json({ success: true, tags: updatedTags });
+    } catch (error) {
+        console.error('Add tags error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Set video category
+app.put('/api/video/:id/category', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        const { category } = req.body;
+        
+        await databaseService.setVideoCategory(videoId, category);
+        res.json({ success: true, category });
+    } catch (error) {
+        console.error('Set category error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Toggle favorite status
+app.post('/api/video/:id/favorite', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        const favorite = await databaseService.toggleFavorite(videoId);
+        res.json({ success: true, favorite });
+    } catch (error) {
+        console.error('Toggle favorite error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Increment view count
+app.post('/api/video/:id/view', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        const viewCount = await databaseService.incrementViewCount(videoId);
+        res.json({ success: true, viewCount });
+    } catch (error) {
+        console.error('View count error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Advanced search endpoint
+app.post('/api/search', async (req, res) => {
+    try {
+        const searchResult = await databaseService.advancedSearch(req.body);
+        res.json(searchResult);
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Generate sharing link
+app.post('/api/video/:id/share', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+        const { expiresInHours = 24 } = req.body;
+        
+        const shareId = await databaseService.generateSharingLink(videoId, expiresInHours);
+        res.json({ 
+            success: true, 
+            shareId,
+            shareUrl: `${req.protocol}://${req.get('host')}/share/${shareId}`,
+            expiresInHours
+        });
+    } catch (error) {
+        console.error('Share link error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Access shared video
+app.get('/share/:shareId', async (req, res) => {
+    try {
+        const shareId = req.params.shareId;
+        const shareData = await databaseService.getVideoByShareId(shareId);
+        
+        if (!shareData) {
+            return res.status(404).json({ error: 'Shared video not found or expired' });
+        }
+        
+        res.json({
+            video: shareData.video,
+            streamUrl: `/api/stream/${shareData.videoId}`,
+            shareInfo: shareData.shareLink
+        });
+    } catch (error) {
+        console.error('Shared video error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Storage health check
+app.get('/api/storage/health', async (req, res) => {
+    try {
+        const health = await telegramService.getStorageHealth();
+        res.json(health);
+    } catch (error) {
+        console.error('Storage health error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Video statistics endpoint
+app.get('/api/stats', async (req, res) => {
+    try {
+        const stats = await databaseService.getVideoStats();
+        res.json(stats);
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cleanup endpoint to remove local files
+app.post('/api/cleanup', async (req, res) => {
+    try {
+        const cleanupResults = {
+            uploads: { cleaned: 0, errors: 0 },
+            temp: { cleaned: 0, errors: 0 },
+            hls: { cleaned: 0, errors: 0 }
+        };
+
+        // Clean uploads directory
+        try {
+            const uploadFiles = await fs.readdir('uploads');
+            for (const file of uploadFiles) {
+                try {
+                    await fs.remove(path.join('uploads', file));
+                    cleanupResults.uploads.cleaned++;
+                    console.log(`Cleaned upload file: ${file}`);
+                } catch (error) {
+                    cleanupResults.uploads.errors++;
+                    console.warn(`Failed to clean upload file ${file}:`, error.message);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read uploads directory:', error.message);
+        }
+
+        // Clean temp directory
+        try {
+            const tempFiles = await fs.readdir('temp');
+            for (const file of tempFiles) {
+                try {
+                    await fs.remove(path.join('temp', file));
+                    cleanupResults.temp.cleaned++;
+                    console.log(`Cleaned temp file: ${file}`);
+                } catch (error) {
+                    cleanupResults.temp.errors++;
+                    console.warn(`Failed to clean temp file ${file}:`, error.message);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read temp directory:', error.message);
+        }
+
+        // Clean hls directory if it exists
+        try {
+            if (await fs.pathExists('hls')) {
+                const hlsFiles = await fs.readdir('hls');
+                for (const file of hlsFiles) {
+                    try {
+                        await fs.remove(path.join('hls', file));
+                        cleanupResults.hls.cleaned++;
+                        console.log(`Cleaned HLS file/directory: ${file}`);
+                    } catch (error) {
+                        cleanupResults.hls.errors++;
+                        console.warn(`Failed to clean HLS file ${file}:`, error.message);
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read hls directory:', error.message);
+        }
+
+        const totalCleaned = cleanupResults.uploads.cleaned + cleanupResults.temp.cleaned + cleanupResults.hls.cleaned;
+        const totalErrors = cleanupResults.uploads.errors + cleanupResults.temp.errors + cleanupResults.hls.errors;
+
+        res.json({
+            success: true,
+            message: `Cleanup completed: ${totalCleaned} files cleaned, ${totalErrors} errors`,
+            details: cleanupResults
+        });
+
+    } catch (error) {
+        console.error('Cleanup error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Automatic cleanup function
+const performAutomaticCleanup = async () => {
+    try {
+        console.log('Performing automatic cleanup of temporary files...');
+        
+        // Clean uploads directory (files older than 1 hour)
+        try {
+            const uploadFiles = await fs.readdir('uploads');
+            let cleanedCount = 0;
+            
+            for (const file of uploadFiles) {
+                const filePath = path.join('uploads', file);
+                const stats = await fs.stat(filePath);
+                const fileAge = Date.now() - stats.mtime.getTime();
+                
+                // Remove files older than 1 hour (3600000 ms)
+                if (fileAge > 3600000) {
+                    await fs.remove(filePath);
+                    cleanedCount++;
+                    console.log(`Auto-cleaned old upload file: ${file}`);
+                }
+            }
+            
+            if (cleanedCount > 0) {
+                console.log(`Auto-cleanup: Removed ${cleanedCount} old upload files`);
+            }
+        } catch (error) {
+            console.warn('Auto-cleanup uploads failed:', error.message);
+        }
+
+        // Clean temp directory (files older than 30 minutes)
+        try {
+            const tempFiles = await fs.readdir('temp');
+            let cleanedCount = 0;
+            
+            for (const file of tempFiles) {
+                const filePath = path.join('temp', file);
+                const stats = await fs.stat(filePath);
+                const fileAge = Date.now() - stats.mtime.getTime();
+                
+                // Remove files older than 30 minutes (1800000 ms)
+                if (fileAge > 1800000) {
+                    await fs.remove(filePath);
+                    cleanedCount++;
+                    console.log(`Auto-cleaned old temp file: ${file}`);
+                }
+            }
+            
+            if (cleanedCount > 0) {
+                console.log(`Auto-cleanup: Removed ${cleanedCount} old temp files`);
+            }
+        } catch (error) {
+            console.warn('Auto-cleanup temp failed:', error.message);
+        }
+        
+    } catch (error) {
+        console.warn('Automatic cleanup failed:', error.message);
+    }
+};
+
 // Start server
 const startServer = async () => {
     try {
         await ensureDirectories();
         await databaseService.initialize();
         
+        // Start automatic cleanup every 30 minutes
+        setInterval(performAutomaticCleanup, 30 * 60 * 1000); // 30 minutes
+        
+        // Perform initial cleanup
+        setTimeout(performAutomaticCleanup, 5000); // After 5 seconds
+        
         app.listen(PORT, () => {
             console.log(`Server running on http://localhost:${PORT}`);
             console.log('Make sure to configure your .env file with Telegram bot credentials');
+            console.log('Automatic cleanup enabled: uploads (1h), temp (30min)');
         });
     } catch (error) {
         console.error('Failed to start server:', error);

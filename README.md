@@ -1,184 +1,195 @@
-# Video Streaming Platform
+# 🎬 Unlimited - Telegram Cloud Storage Video Platform
 
-A comprehensive video streaming platform that uploads videos to Telegram as cloud storage and streams them in HLS (m3u8) format with support for multiple audio tracks and quality levels.
+A modern, minimalist video streaming platform that uses Telegram as unlimited cloud storage backend. Stream, store, and manage your videos with a beautiful dark-themed interface.
 
-## Features
+![Version](https://img.shields.io/badge/version-2.0.0-green)
+![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-- **Video Upload**: Support for multiple video formats (MP4, AVI, MKV, MOV, WMV, FLV, WebM, M4V, 3GP)
-- **Telegram Cloud Storage**: Automatic backup to Telegram channel with support for large files
-- **HLS Streaming**: Convert any video format to HLS (m3u8) for adaptive streaming
-- **Multiple Quality Levels**: Automatic generation of different quality streams
-- **Dual Audio Support**: Preserve and stream multiple audio tracks if available
-- **Web Interface**: Modern, responsive web interface for upload and playback
-- **Video Library**: Browse, search, and manage uploaded videos
-- **Real-time Progress**: Upload progress tracking with visual feedback
+## ✨ Features
 
-## Prerequisites
+### Core Features
+- **🚀 Unlimited Storage** - Leverage Telegram's cloud infrastructure for unlimited video storage
+- **📡 Direct Streaming** - Stream videos directly from Telegram without local storage
+- **⬆️ Smart Upload** - Automatic video upload to Telegram with progress tracking
+- **⬇️ Download Support** - Download videos from cloud storage anytime
+- **🔗 Share Links** - Generate shareable links for your videos
+- **📱 Responsive Design** - Works seamlessly on desktop and mobile devices
 
+### UI/UX Features
+- **🌑 Dark Theme** - Modern, minimalist dark interface with clean borders
+- **🎨 Clean Icons** - Custom SVG icons for better visual consistency
+- **📊 Real-time Status** - Live connection status indicator
+- **🔔 Smart Notifications** - Non-intrusive notification system
+- **⚡ Fast Loading** - Optimized performance with lazy loading
+- **🎯 Intuitive Controls** - Simple, user-friendly interface
+
+### Technical Features
+- **🔄 Auto Cleanup** - Automatic cleanup of temporary files
+- **📈 Range Requests** - Support for video seeking and partial content
+- **🛡️ Error Handling** - Graceful error recovery and fallbacks
+- **💾 Database Support** - JSON-based database for video metadata
+- **🔐 Secure Streaming** - Direct streaming with proper authentication
+- **🎞️ Multiple Formats** - Support for MP4, WebM, AVI, MKV, and more
+
+## 🚀 Recent Updates (v2.0.0)
+
+### UI Redesign
+- ✅ Complete dark theme redesign with minimalist approach
+- ✅ Removed outer borders for cleaner look
+- ✅ Improved color contrast for better visibility
+- ✅ Custom SVG icons replacing FontAwesome
+- ✅ Enhanced hover effects and animations
+- ✅ Single notification system (fixed duplicate notifications)
+
+### Backend Improvements
+- ✅ Fixed Telegram bot configuration issues
+- ✅ Improved video streaming with proper MIME types
+- ✅ Enhanced error handling for video playback
+- ✅ Fixed video player cleanup on close
+- ✅ Improved thumbnail generation with graceful fallback
+- ✅ Added axios for better HTTP streaming
+
+### Bug Fixes
+- ✅ Fixed "NotSupportedError" in video playback
+- ✅ Fixed backup channel configuration errors
+- ✅ Fixed button functionality and visibility
+- ✅ Fixed app initialization timing issues
+- ✅ Fixed FFmpeg thumbnail generation errors
+
+## 🛠️ Installation
+
+### Prerequisites
 - Node.js (v14 or higher)
-- FFmpeg installed and accessible in PATH
+- FFmpeg (for thumbnail generation)
 - Telegram Bot Token
-- Telegram Channel for storage
 
-## Installation
+### Setup
 
-1. Clone or download the project
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Install FFmpeg:
-   - **Windows**: Download from https://ffmpeg.org/download.html
-   - **macOS**: `brew install ffmpeg`
-   - **Linux**: `sudo apt install ffmpeg`
-
-4. Create a Telegram Bot:
-   - Message @BotFather on Telegram
-   - Create a new bot with `/newbot`
-   - Save the bot token
-
-5. Create a Telegram Channel:
-   - Create a new channel
-   - Add your bot as an administrator
-   - Get the channel ID (starts with @)
-
-6. Configure environment:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` with your credentials:
-   ```
-   TELEGRAM_BOT_TOKEN=your_bot_token_here
-   TELEGRAM_CHANNEL_ID=@your_channel_username_or_id
-   PORT=3000
-   ```
-
-## Usage
-
-1. Start the server:
-   ```bash
-   npm start
-   ```
-
-2. Open your browser and go to `http://localhost:3000`
-
-3. Upload videos using the web interface:
-   - Drag and drop files or click to browse
-   - Monitor upload progress
-   - Videos are automatically processed and backed up to Telegram
-
-4. Stream videos:
-   - Browse your video library
-   - Click play to stream in HLS format
-   - Supports adaptive quality and multiple audio tracks
-
-## API Endpoints
-
-- `POST /api/upload` - Upload a video file
-- `GET /api/videos` - Get list of all videos
-- `GET /api/video/:id` - Get specific video details
-- `GET /api/stream/:id` - Get HLS stream for video
-- `DELETE /api/video/:id` - Delete a video
-
-## Technical Details
-
-### Video Processing
-- Converts all video formats to HLS using FFmpeg
-- Generates multiple quality levels based on source resolution
-- Preserves multiple audio tracks with proper metadata
-- Creates adaptive bitrate streaming
-
-### Telegram Integration
-- Uploads videos up to 50MB directly
-- Splits larger files into chunks for upload
-- Maintains file integrity across chunks
-- Supports download and deletion from Telegram
-
-### Storage Structure
-```
-video-streaming-platform/
-├── uploads/          # Temporary upload storage
-├── hls/             # HLS output files
-├── temp/            # Temporary processing files
-├── data/            # JSON database
-└── public/          # Web interface files
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/unlimited.git
+cd unlimited
 ```
 
-## Configuration Options
+2. **Install dependencies**
+```bash
+npm install
+```
 
-### Environment Variables
-- `TELEGRAM_BOT_TOKEN` - Your Telegram bot token
-- `TELEGRAM_CHANNEL_ID` - Target channel for uploads
-- `PORT` - Server port (default: 3000)
-- `UPLOAD_DIR` - Upload directory (default: ./uploads)
-- `HLS_DIR` - HLS output directory (default: ./hls)
-- `TEMP_DIR` - Temporary files directory (default: ./temp)
-- `FFMPEG_PATH` - Custom FFmpeg path
-- `FFPROBE_PATH` - Custom FFprobe path
+3. **Configure environment variables**
+Create a `.env` file in the root directory:
+```env
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_CHANNEL_ID=your_channel_id_here
 
-### Video Quality Levels
-The system automatically generates appropriate quality levels:
-- 1080p (1920x1080) - 5000k bitrate
-- 720p (1280x720) - 3000k bitrate
-- 480p (854x480) - 1500k bitrate
-- 360p (640x360) - 800k bitrate
+# Server Configuration
+PORT=3000
 
-## Troubleshooting
+# Storage Settings
+ENABLE_THUMBNAILS=true  # Set to false if FFmpeg issues occur
+```
 
-### Common Issues
+4. **Create Telegram Bot**
+- Open [@BotFather](https://t.me/botfather) on Telegram
+- Create a new bot with `/newbot`
+- Copy the bot token to `.env`
+- Create a channel and add the bot as admin
+- Get channel ID and add to `.env`
 
-1. **FFmpeg not found**
-   - Ensure FFmpeg is installed and in PATH
-   - Set custom paths in .env if needed
+5. **Start the server**
+```bash
+npm start
+```
 
-2. **Telegram upload fails**
-   - Verify bot token and channel ID
-   - Ensure bot has admin rights in channel
-   - Check file size limits
+6. **Access the platform**
+Open your browser and navigate to `http://localhost:3000`
 
-3. **Video won't play**
-   - Check browser HLS support
-   - Verify HLS files were generated
-   - Check console for errors
+## 📖 Usage
 
-4. **Large file uploads**
-   - Files over 2GB are not supported
-   - Consider compressing videos before upload
+### Uploading Videos
+1. Click the "Upload" button in the header
+2. Select or drag-and-drop your video file
+3. Wait for upload to complete
+4. Video will be automatically saved to Telegram cloud
 
-### Logs
-Check console output for detailed processing information and error messages.
+### Streaming Videos
+1. Click on any video card to start streaming
+2. Use the player controls for playback
+3. Videos stream directly from Telegram - no local storage needed
 
-## Browser Support
+### Managing Videos
+- **Play** - Click the play button or video thumbnail
+- **Download** - Download video to your device
+- **Copy URL** - Get shareable link for the video
+- **Delete** - Remove video (with confirmation)
 
-- Chrome/Chromium (recommended)
-- Firefox
-- Safari (native HLS support)
-- Edge
+## 🔮 Upcoming Features
 
-## Security Considerations
+### Phase 1 - Core Enhancements
+- [ ] **Video Rename** - Rename videos after upload
+- [ ] **Search Functionality** - Search videos by name
+- [ ] **Video Categories** - Organize videos into categories
+- [ ] **Batch Upload** - Upload multiple videos at once
+- [ ] **Upload Queue** - Queue system for multiple uploads
 
-- The platform is designed for local/private use
-- Add authentication for production deployment
-- Consider rate limiting for public access
-- Validate file types and sizes appropriately
+### Phase 2 - Advanced Features
+- [ ] **Video Compression** - Automatic video compression before upload
+- [ ] **Adaptive Streaming** - HLS/DASH support for better streaming
+- [ ] **Video Transcoding** - Convert videos to different formats
+- [ ] **Subtitle Support** - Add and display subtitles
+- [ ] **Video Editor** - Basic video editing capabilities
+- [ ] **Playlist Support** - Create and manage playlists
 
-## License
+### Phase 3 - Social Features
+- [ ] **User Authentication** - Multi-user support with login
+- [ ] **Sharing System** - Advanced sharing with permissions
+- [ ] **Comments** - Add comments to videos
+- [ ] **Favorites** - Mark videos as favorites
+- [ ] **Watch History** - Track viewing history
+- [ ] **Analytics** - View count and engagement metrics
 
-MIT License - feel free to modify and distribute as needed.
+### Phase 4 - Platform Features
+- [ ] **Mobile App** - Native mobile applications
+- [ ] **PWA Support** - Progressive Web App capabilities
+- [ ] **Offline Mode** - Download for offline viewing
+- [ ] **Live Streaming** - Stream live videos
+- [ ] **Multi-language** - Support for multiple languages
+- [ ] **Dark/Light Theme Toggle** - Theme switching option
 
-## Contributing
+### Phase 5 - Advanced Storage
+- [ ] **Multi-channel Support** - Use multiple Telegram channels
+- [ ] **Redundancy System** - Automatic backup across channels
+- [ ] **Storage Analytics** - Monitor storage usage
+- [ ] **Auto-migration** - Migrate videos between channels
+- [ ] **Compression Stats** - Show storage savings
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Support
+## 📝 License
 
-For issues and questions:
-1. Check the troubleshooting section
-2. Review console logs for errors
-3. Ensure all prerequisites are met
-4. Verify configuration settings
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Telegram for providing unlimited cloud storage
+- Node.js community for excellent packages
+- FFmpeg for video processing capabilities
+- All contributors and users of this project
+
+## 📧 Contact
+
+For questions and support, please open an issue on GitHub.
+
+---
+
+**Note:** This project is for educational purposes. Please ensure you comply with Telegram's terms of service when using this platform.

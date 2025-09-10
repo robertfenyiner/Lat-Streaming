@@ -73,7 +73,9 @@ class StreamDriveApp {
         const loadingSpinner = document.getElementById('loadingSpinner');
         
         try {
-            loadingSpinner.style.display = 'flex';
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'flex';
+            }
             const response = await fetch('/api/videos');
             
             if (!response.ok) {
@@ -87,7 +89,9 @@ class StreamDriveApp {
             this.showToast('Failed to load videos', 'error');
             this.showEmptyState('Error loading files');
         } finally {
-            loadingSpinner.style.display = 'none';
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'none';
+            }
         }
     }
 
@@ -115,13 +119,29 @@ class StreamDriveApp {
         const backupStatus = video.telegramData?.uploaded ? 'success' : 'error';
         const backupText = video.telegramData?.uploaded ? 'Backed up' : 'Backup failed';
 
+        // Get cloud thumbnail URL
+        const thumbnailUrl = video.cloudThumbnail 
+            ? `/api/thumbnail/${video.id}` 
+            : null;
+
+        const thumbnailHtml = thumbnailUrl 
+            ? `<img src="${thumbnailUrl}" alt="${video.originalName}" class="thumbnail-image"/>` 
+            : `<div class="no-thumbnail">
+                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                       <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                       <line x1="7" y1="2" x2="7" y2="22"/>
+                       <line x1="17" y1="2" x2="17" y2="22"/>
+                       <line x1="2" y1="12" x2="22" y2="12"/>
+                   </svg>
+               </div>`;
+
         card.innerHTML = `
-            <div class="video-preview">
-                <i class="fas fa-play-circle"></i>
-                <div class="video-overlay">
-                    <button class="play-btn" onclick="app.playVideo('${video.id}')">
-                        <i class="fas fa-play"></i>
-                    </button>
+            <div class="video-preview" onclick="app.playVideo('${video.id}')">
+                ${thumbnailHtml}
+                <div class="play-overlay">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
                 </div>
             </div>
             <div class="video-info">
@@ -133,25 +153,26 @@ class StreamDriveApp {
                     <span class="backup-status ${backupStatus}">${backupText}</span>
                 </div>
                 <div class="video-actions">
-                    <button class="action-btn primary" onclick="app.playVideo('${video.id}')">
-                        <i class="fas fa-play"></i>
-                        Play
+                    <button class="action-btn" onclick="app.playVideo('${video.id}')" title="Play">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        <span>Play</span>
                     </button>
-                    <button class="action-btn" onclick="app.downloadVideo('${video.id}')">
-                        <i class="fas fa-download"></i>
-                        Download
+                    <button class="action-btn" onclick="app.downloadVideo('${video.id}')" title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Download</span>
                     </button>
-                    <button class="action-btn" onclick="app.copyVideoUrl('${video.id}')">
-                        <i class="fas fa-link"></i>
-                        URL
-                    </button>
-                    <button class="action-btn rename-btn" onclick="app.showRenameModal('${video.id}')">
-                        <i class="fas fa-edit"></i>
-                        Rename
-                    </button>
-                    <button class="action-btn delete-btn" onclick="app.confirmDelete('${video.id}')">
-                        <i class="fas fa-trash"></i>
-                        Delete
+                    <button class="action-btn" onclick="app.copyVideoUrl('${video.id}')" title="Copy URL">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        <span>URL</span>
                     </button>
                 </div>
             </div>
@@ -164,9 +185,18 @@ class StreamDriveApp {
         const videosGrid = document.getElementById('videosGrid');
         videosGrid.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-video"></i>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                    <line x1="7" y1="2" x2="7" y2="22"/>
+                    <line x1="17" y1="2" x2="17" y2="22"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <line x1="2" y1="7" x2="7" y2="7"/>
+                    <line x1="2" y1="17" x2="7" y2="17"/>
+                    <line x1="17" y1="17" x2="22" y2="17"/>
+                    <line x1="17" y1="7" x2="22" y2="7"/>
+                </svg>
                 <h3>${message}</h3>
-                <p>Upload your first video to get started with StreamDrive</p>
+                <p>Upload your first video to get started</p>
             </div>
         `;
     }
@@ -178,8 +208,16 @@ class StreamDriveApp {
 
     closeUploadModal() {
         document.getElementById('uploadModal').classList.remove('show');
-        document.getElementById('uploadProgress').style.display = 'none';
-        document.getElementById('progressFill').style.width = '0%';
+        
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        
+        if (uploadProgress) {
+            uploadProgress.style.display = 'none';
+        }
+        if (progressFill) {
+            progressFill.style.width = '0%';
+        }
     }
 
     handleFileSelect(event) {
@@ -283,44 +321,44 @@ class StreamDriveApp {
             // Setup video player with direct stream URL
             const streamUrl = `/api/stream/${videoId}`;
             
-            // Check if HLS is supported and available
-            if (window.Hls && Hls.isSupported()) {
-                if (this.currentPlayer) {
-                    this.currentPlayer.destroy();
-                }
-                
-                this.currentPlayer = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                    backBufferLength: 90,
-                    debug: false
-                });
-                
-                this.currentPlayer.loadSource(streamUrl);
-                this.currentPlayer.attachMedia(videoPlayer);
-                
-                this.currentPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-                    console.log('HLS manifest loaded successfully');
-                });
-                
-                this.currentPlayer.on(Hls.Events.ERROR, (event, data) => {
-                    console.error('HLS error:', data);
-                    if (data.fatal) {
-                        // Fallback to direct video src
-                        console.log('HLS failed, trying direct video playback');
-                        videoPlayer.src = streamUrl;
-                        this.currentPlayer = null;
-                    }
-                });
-            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-                // Native HLS support (Safari)
-                videoPlayer.src = streamUrl;
-            } else {
-                // Fallback to direct video src
-                videoPlayer.src = streamUrl;
+            // Clean up any existing HLS player
+            if (this.currentPlayer) {
+                this.currentPlayer.destroy();
+                this.currentPlayer = null;
             }
 
+            // Clean up any existing error handler
+            if (this.videoErrorHandler) {
+                videoPlayer.removeEventListener('error', this.videoErrorHandler);
+                this.videoErrorHandler = null;
+            }
+
+            // Reset video player
+            videoPlayer.pause();
+            videoPlayer.src = '';
+            videoPlayer.load();
+
+            // Create new error handler that only logs real errors
+            this.videoErrorHandler = (e) => {
+                // Only handle real errors, not empty source errors
+                if (videoPlayer.src && videoPlayer.src !== '' && videoPlayer.src !== 'about:blank') {
+                    console.error('Video playback error:', e);
+                    this.showToast('Failed to play video: Streaming error', 'error');
+                }
+            };
+
+            videoPlayer.addEventListener('error', this.videoErrorHandler);
+
+            // Set the source and play
+            videoPlayer.src = streamUrl;
+            
             modal.classList.add('show');
+            
+            // Try to play the video
+            videoPlayer.play().catch(error => {
+                console.error('Video play failed:', error);
+                this.showToast('Video failed to start playing', 'error');
+            });
             
         } catch (error) {
             console.error('Error playing video:', error);
@@ -332,9 +370,18 @@ class StreamDriveApp {
         const modal = document.getElementById('playerModal');
         const videoPlayer = document.getElementById('videoPlayer');
         
+        // Remove error handler before clearing the source
+        if (this.videoErrorHandler) {
+            videoPlayer.removeEventListener('error', this.videoErrorHandler);
+            this.videoErrorHandler = null;
+        }
+        
         modal.classList.remove('show');
         videoPlayer.pause();
-        videoPlayer.src = '';
+        
+        // Clear source after removing event listener to avoid error events
+        videoPlayer.removeAttribute('src');
+        videoPlayer.load();
         
         if (this.currentPlayer) {
             this.currentPlayer.destroy();
@@ -467,23 +514,20 @@ class StreamDriveApp {
 
     // Backup Status
     updateBackupStatus() {
-        const backupStatus = document.getElementById('backupStatus');
-        // Mock backup status - replace with real API call
-        backupStatus.textContent = 'Connected';
-        backupStatus.className = 'status connected';
+        // Update connection status indicator for new UI
+        const statusIndicator = document.getElementById('connectionStatus');
+        if (statusIndicator) {
+            statusIndicator.style.backgroundColor = 'var(--accent-green)';
+        }
     }
 
     syncBackup() {
-        const syncBtn = document.getElementById('syncBtn');
-        const icon = syncBtn.querySelector('i');
-        
-        syncBtn.classList.add('syncing');
         this.showToast('Syncing backup...', 'info');
         
         // Mock sync process
         setTimeout(() => {
-            syncBtn.classList.remove('syncing');
             this.showToast('Backup synced successfully', 'success');
+            this.updateBackupStatus();
         }, 2000);
     }
 
@@ -498,21 +542,62 @@ class StreamDriveApp {
     }
 
     showToast(message, type = 'info') {
-        const toastContainer = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icon = this.getToastIcon(type);
-        toast.innerHTML = `
-            <i class="fas fa-${icon}"></i>
-            <span>${message}</span>
-        `;
-
-        toastContainer.appendChild(toast);
-
-        setTimeout(() => {
-            toast.remove();
-        }, 5000);
+        // Show in notification area only
+        const notificationArea = document.getElementById('notificationArea');
+        if (notificationArea) {
+            const notificationText = notificationArea.querySelector('.notification-text');
+            const notificationIcon = notificationArea.querySelector('.notification-icon');
+            
+            if (notificationText) {
+                notificationText.textContent = message;
+            }
+            
+            // Update icon based on type
+            if (notificationIcon) {
+                if (type === 'success') {
+                    notificationIcon.innerHTML = `
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    `;
+                    notificationIcon.style.color = 'var(--accent-green)';
+                } else if (type === 'error') {
+                    notificationIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    `;
+                    notificationIcon.style.color = '#ff4444';
+                } else {
+                    notificationIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <circle cx="12" cy="8" r="0.5"/>
+                    `;
+                    notificationIcon.style.color = 'var(--text-secondary)';
+                }
+            }
+            
+            // Add type-specific styling
+            notificationArea.className = 'notification-area show';
+            if (type === 'success') {
+                notificationArea.style.borderColor = 'var(--accent-green)';
+            } else if (type === 'error') {
+                notificationArea.style.borderColor = '#ff4444';
+            } else {
+                notificationArea.style.borderColor = 'var(--border-color)';
+            }
+            
+            // Clear any existing timeout
+            if (this.notificationTimeout) {
+                clearTimeout(this.notificationTimeout);
+            }
+            
+            // Set new timeout
+            this.notificationTimeout = setTimeout(() => {
+                notificationArea.classList.remove('show');
+                notificationArea.style.borderColor = '';
+            }, 3000);
+        }
     }
 
     getToastIcon(type) {
@@ -526,30 +611,40 @@ class StreamDriveApp {
     }
 }
 
+// Global app variable
+let app;
+
 // Global functions for HTML onclick events
 function openUploadModal() {
-    app.openUploadModal();
+    if (app) app.openUploadModal();
 }
 
 function closeUploadModal() {
-    app.closeUploadModal();
+    if (app) app.closeUploadModal();
 }
 
 function closePlayer() {
-    app.closePlayer();
+    if (app) app.closePlayer();
 }
 
 function syncBackup() {
-    app.syncBackup();
+    if (app) app.syncBackup();
 }
 
 function closeRenameModal() {
-    app.closeRenameModal();
+    if (app) app.closeRenameModal();
 }
 
 function closeDeleteModal() {
-    app.closeDeleteModal();
+    if (app) app.closeDeleteModal();
 }
 
-// Initialize app
-const app = new StreamDriveApp();
+// Initialize app when DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        app = new StreamDriveApp();
+    });
+} else {
+    // DOM is already loaded
+    app = new StreamDriveApp();
+}

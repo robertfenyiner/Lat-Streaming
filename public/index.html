@@ -3,45 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamDrive - Video Cloud Storage</title>
+    <title>Telegram Cloud Storage</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="logo">
-            <i class="fas fa-video"></i>
-            <span>StreamDrive</span>
-        </div>
-        <button class="upload-btn" onclick="openUploadModal()">
-            <i class="fas fa-plus"></i>
-            Upload Video
-        </button>
-    </header>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Backup Status Bar -->
-        <div class="backup-status-bar">
-            <div class="backup-info">
-                <i class="fas fa-cloud"></i>
-                <span>Telegram Backup: </span>
-                <span class="status connected" id="backupStatus">Connected</span>
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Header Bar -->
+        <header class="header-bar">
+            <div class="telegram-status">
+                <span class="brand-text">Telegram</span>
+                <div class="status-indicator" id="connectionStatus"></div>
             </div>
-            <button class="sync-btn" onclick="syncBackup()" id="syncBtn">
-                <i class="fas fa-sync-alt"></i>
+            <button class="upload-button" onclick="openUploadModal()">
+                Upload
             </button>
-        </div>
+        </header>
 
-        <!-- Videos Grid -->
-        <div class="videos-grid" id="videosGrid">
-            <div class="loading" id="loadingSpinner">
-                <i class="fas fa-spinner fa-spin"></i>
-                Loading videos...
+        <!-- Main Content Area -->
+        <main class="content-area">
+            <!-- Videos Grid -->
+            <div class="videos-container" id="videosGrid">
+                <div class="loading-state" id="loadingSpinner">
+                    <svg class="loading-spinner" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
+                        <path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round"/>
+                    </svg>
+                    <span>Loading videos...</span>
+                </div>
             </div>
+        </main>
+
+        <!-- Notification Area -->
+        <div class="notification-area" id="notificationArea">
+            <svg class="notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <span class="notification-text">Notification</span>
         </div>
-    </main>
+    </div>
 
     <!-- Upload Modal -->
     <div class="upload-modal" id="uploadModal">

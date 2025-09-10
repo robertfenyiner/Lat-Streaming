@@ -74,6 +74,25 @@ class DatabaseService {
         return await this.updateVideo(videoId, { originalName: newName });
     }
 
+    async updateVideoMetadata(videoId, updates) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        // Merge the updates with existing video data
+        const updatedVideo = { 
+            ...video, 
+            ...updates, 
+            updatedDate: new Date().toISOString() 
+        };
+        
+        this.videos.set(videoId, updatedVideo);
+        await this.saveDatabase();
+        
+        return updatedVideo;
+    }
+
     async deleteVideo(videoId) {
         const deleted = this.videos.delete(videoId);
         if (deleted) {
@@ -169,6 +188,187 @@ class DatabaseService {
             return true;
         }
         return false;
+    }
+
+    async addVideoTags(videoId, tags) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        video.tags = video.tags || [];
+        const newTags = Array.isArray(tags) ? tags : [tags];
+        
+        newTags.forEach(tag => {
+            if (tag && !video.tags.includes(tag.toLowerCase())) {
+                video.tags.push(tag.toLowerCase());
+            }
+        });
+
+        video.updatedDate = new Date().toISOString();
+        await this.saveDatabase();
+        return video.tags;
+    }
+
+    async setVideoCategory(videoId, category) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        video.category = category;
+        video.updatedDate = new Date().toISOString();
+        await this.saveDatabase();
+        return video;
+    }
+
+    async toggleFavorite(videoId) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        video.favorite = !video.favorite;
+        video.updatedDate = new Date().toISOString();
+        await this.saveDatabase();
+        return video.favorite;
+    }
+
+    async incrementViewCount(videoId) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        video.viewCount = (video.viewCount || 0) + 1;
+        video.lastViewed = new Date().toISOString();
+        await this.saveDatabase();
+        return video.viewCount;
+    }
+
+    async advancedSearch(criteria) {
+        const {
+            query,
+            tags,
+            category,
+            minDuration,
+            maxDuration,
+            favorite,
+            sortBy = 'uploadDate',
+            sortOrder = 'desc',
+            limit,
+            offset = 0
+        } = criteria;
+
+        let results = Array.from(this.videos.values());
+
+        if (query) {
+            const searchTerm = query.toLowerCase();
+            results = results.filter(video => 
+                video.originalName.toLowerCase().includes(searchTerm) ||
+                (video.tags && video.tags.some(tag => tag.includes(searchTerm)))
+            );
+        }
+
+        if (tags && tags.length > 0) {
+            const searchTags = tags.map(tag => tag.toLowerCase());
+            results = results.filter(video => 
+                video.tags && searchTags.every(tag => video.tags.includes(tag))
+            );
+        }
+
+        if (category) {
+            results = results.filter(video => video.category === category);
+        }
+
+        if (minDuration || maxDuration) {
+            results = results.filter(video => {
+                const duration = video.metadata?.duration || 0;
+                return (!minDuration || duration >= minDuration) && 
+                       (!maxDuration || duration <= maxDuration);
+            });
+        }
+
+        if (favorite !== undefined) {
+            results = results.filter(video => !!video.favorite === favorite);
+        }
+
+        results.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (sortBy) {
+                case 'name':
+                    aValue = a.originalName.toLowerCase();
+                    bValue = b.originalName.toLowerCase();
+                    break;
+                case 'size':
+                    aValue = a.size || 0;
+                    bValue = b.size || 0;
+                    break;
+                case 'duration':
+                    aValue = a.metadata?.duration || 0;
+                    bValue = b.metadata?.duration || 0;
+                    break;
+                case 'viewCount':
+                    aValue = a.viewCount || 0;
+                    bValue = b.viewCount || 0;
+                    break;
+                case 'uploadDate':
+                default:
+                    aValue = new Date(a.uploadDate);
+                    bValue = new Date(b.uploadDate);
+                    break;
+            }
+
+            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        const total = results.length;
+        if (limit) {
+            results = results.slice(offset, offset + limit);
+        }
+
+        return { videos: results, total, offset, limit: limit || total };
+    }
+
+    async generateSharingLink(videoId, expiresInHours = 24) {
+        const video = this.videos.get(videoId);
+        if (!video) {
+            throw new Error('Video not found');
+        }
+
+        const crypto = require('crypto');
+        const shareId = crypto.randomBytes(16).toString('hex');
+        const expiresAt = new Date(Date.now() + (expiresInHours * 60 * 60 * 1000));
+
+        video.shareLinks = video.shareLinks || [];
+        video.shareLinks.push({
+            shareId: shareId,
+            createdAt: new Date().toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            active: true
+        });
+
+        await this.saveDatabase();
+        return shareId;
+    }
+
+    async getVideoByShareId(shareId) {
+        for (const [videoId, video] of this.videos) {
+            if (video.shareLinks) {
+                const shareLink = video.shareLinks.find(link => 
+                    link.shareId === shareId && 
+                    link.active && 
+                    new Date(link.expiresAt) > new Date()
+                );
+                if (shareLink) {
+                    return { videoId, video, shareLink };
+                }
+            }
+        }
+        return null;
     }
 }
 
