@@ -68,7 +68,7 @@ A modern, minimalist video streaming platform that uses Telegram as unlimited cl
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/unlimited.git
+git clone https://github.com/friday2su/unlimited.git
 cd unlimited
 ```
 
