@@ -1,7 +1,7 @@
 {
-  "name": "video-streaming-platform",
+  "name": "lat-streaming",
   "version": "1.0.0",
-  "description": "Video streaming platform with Telegram cloud storage",
+  "description": "Plataforma de streaming de video con almacenamiento en la nube de Telegram",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -28,8 +28,10 @@
     "streaming",
     "telegram",
     "m3u8",
-    "hls"
+    "hls",
+    "lat-streaming",
+    "plataforma"
   ],
-  "author": "Video Streaming Platform",
+  "author": "Lat-Streaming Platform",
   "license": "MIT"
 }

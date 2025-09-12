@@ -86,8 +86,8 @@ class StreamDriveApp {
             this.renderVideos();
         } catch (error) {
             console.error('Error loading videos:', error);
-            this.showToast('Failed to load videos', 'error');
-            this.showEmptyState('Error loading files');
+            this.showToast('Error al cargar videos', 'error');
+            this.showEmptyState('Error cargando archivos');
         } finally {
             if (loadingSpinner) {
                 loadingSpinner.style.display = 'none';
@@ -99,7 +99,7 @@ class StreamDriveApp {
         const videosGrid = document.getElementById('videosGrid');
         
         if (this.videos.length === 0) {
-            this.showEmptyState('No videos uploaded yet');
+            this.showEmptyState('Aún no hay videos subidos');
             return;
         }
 
@@ -117,7 +117,7 @@ class StreamDriveApp {
         card.dataset.videoId = video.id;
         
         const backupStatus = video.telegramData?.uploaded ? 'success' : 'error';
-        const backupText = video.telegramData?.uploaded ? 'Backed up' : 'Backup failed';
+        const backupText = video.telegramData?.uploaded ? 'Respaldado' : 'Respaldo falló';
 
         // Get cloud thumbnail URL
         const thumbnailUrl = video.cloudThumbnail 
@@ -153,21 +153,21 @@ class StreamDriveApp {
                     <span class="backup-status ${backupStatus}">${backupText}</span>
                 </div>
                 <div class="video-actions">
-                    <button class="action-btn" onclick="app.playVideo('${video.id}')" title="Play">
+                    <button class="action-btn" onclick="app.playVideo('${video.id}')" title="Reproducir">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
-                        <span>Play</span>
+                        <span>Reproducir</span>
                     </button>
-                    <button class="action-btn" onclick="app.downloadVideo('${video.id}')" title="Download">
+                    <button class="action-btn" onclick="app.downloadVideo('${video.id}')" title="Descargar">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
-                        <span>Download</span>
+                        <span>Descargar</span>
                     </button>
-                    <button class="action-btn" onclick="app.copyVideoUrl('${video.id}')" title="Copy URL">
+                    <button class="action-btn" onclick="app.copyVideoUrl('${video.id}')" title="Copiar URL">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -196,7 +196,7 @@ class StreamDriveApp {
                     <line x1="17" y1="7" x2="22" y2="7"/>
                 </svg>
                 <h3>${message}</h3>
-                <p>Upload your first video to get started</p>
+                <p>Sube tu primer video para comenzar</p>
             </div>
         `;
     }
@@ -256,7 +256,7 @@ class StreamDriveApp {
             xhr.addEventListener('load', () => {
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
-                    this.showToast('Video uploaded successfully!', 'success');
+                    this.showToast('¡Video subido exitosamente!', 'success');
                     this.loadVideos();
                     progressText.textContent = 'Upload complete!';
                     setTimeout(() => {
@@ -264,13 +264,13 @@ class StreamDriveApp {
                     }, 2000);
                 } else {
                     const error = JSON.parse(xhr.responseText);
-                    this.showToast(`Upload failed: ${error.error}`, 'error');
+                    this.showToast(`Error de subida: ${error.error}`, 'error');
                     progressContainer.style.display = 'none';
                 }
             });
 
             xhr.addEventListener('error', () => {
-                this.showToast('Upload failed: Network error', 'error');
+                this.showToast('Error de subida: Error de red', 'error');
                 progressContainer.style.display = 'none';
             });
 
@@ -279,7 +279,7 @@ class StreamDriveApp {
 
         } catch (error) {
             console.error('Upload error:', error);
-            this.showToast('Upload failed: ' + error.message, 'error');
+            this.showToast('Error de subida: ' + error.message, 'error');
             progressContainer.style.display = 'none';
         }
     }
@@ -288,12 +288,12 @@ class StreamDriveApp {
         const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
 
         if (!file.type.startsWith('video/')) {
-            this.showToast('Please select a valid video file', 'error');
+            this.showToast('Por favor selecciona un archivo de video válido', 'error');
             return false;
         }
 
         if (file.size > maxSize) {
-            this.showToast('File size must be less than 2GB', 'error');
+            this.showToast('El tamaño del archivo debe ser menor a 2GB', 'error');
             return false;
         }
 
@@ -343,7 +343,7 @@ class StreamDriveApp {
                 // Only handle real errors, not empty source errors
                 if (videoPlayer.src && videoPlayer.src !== '' && videoPlayer.src !== 'about:blank') {
                     console.error('Video playback error:', e);
-                    this.showToast('Failed to play video: Streaming error', 'error');
+                    this.showToast('Error al reproducir video: Error de transmisión', 'error');
                 }
             };
 
@@ -357,12 +357,12 @@ class StreamDriveApp {
             // Try to play the video
             videoPlayer.play().catch(error => {
                 console.error('Video play failed:', error);
-                this.showToast('Video failed to start playing', 'error');
+                this.showToast('El video no pudo iniciar la reproducción', 'error');
             });
             
         } catch (error) {
             console.error('Error playing video:', error);
-            this.showToast(`Failed to play video: ${error.message}`, 'error');
+            this.showToast(`Error al reproducir video: ${error.message}`, 'error');
         }
     }
 
@@ -398,7 +398,7 @@ class StreamDriveApp {
             link.href = `/api/stream/${videoId}`;
             link.download = video.originalName;
             link.click();
-            this.showToast('Download started', 'success');
+            this.showToast('Descarga iniciada', 'success');
         }
     }
 
@@ -406,9 +406,9 @@ class StreamDriveApp {
         const streamUrl = `${window.location.origin}/api/stream/${videoId}`;
         
         navigator.clipboard.writeText(streamUrl).then(() => {
-            this.showToast('Video URL copied to clipboard', 'success');
+            this.showToast('URL del video copiada al portapapeles', 'success');
         }).catch(() => {
-            this.showToast('Failed to copy URL', 'error');
+            this.showToast('Error al copiar URL', 'error');
         });
     }
 
@@ -434,7 +434,7 @@ class StreamDriveApp {
         const newName = document.getElementById('newVideoName').value.trim();
         
         if (!newName) {
-            this.showToast('Please enter a valid name', 'error');
+            this.showToast('Por favor ingresa un nombre válido', 'error');
             return;
         }
 
@@ -454,16 +454,16 @@ class StreamDriveApp {
             });
 
             if (response.ok) {
-                this.showToast('Video renamed successfully', 'success');
+                this.showToast('Video renombrado exitosamente', 'success');
                 this.loadVideos();
                 this.closeRenameModal();
             } else {
                 const error = await response.json();
-                this.showToast(`Failed to rename: ${error.error}`, 'error');
+                this.showToast(`Error al renombrar: ${error.error}`, 'error');
             }
         } catch (error) {
             console.error('Rename error:', error);
-            this.showToast('Failed to rename video', 'error');
+            this.showToast('Error al renombrar video', 'error');
         }
     }
 
@@ -494,16 +494,16 @@ class StreamDriveApp {
             });
 
             if (response.ok) {
-                this.showToast('Video deleted successfully', 'success');
+                this.showToast('Video eliminado exitosamente', 'success');
                 this.loadVideos();
                 this.closeDeleteModal();
             } else {
                 const error = await response.json();
-                this.showToast(`Failed to delete: ${error.error}`, 'error');
+                this.showToast(`Error al eliminar: ${error.error}`, 'error');
             }
         } catch (error) {
             console.error('Delete error:', error);
-            this.showToast('Failed to delete video', 'error');
+            this.showToast('Error al eliminar video', 'error');
         }
     }
 
@@ -522,7 +522,7 @@ class StreamDriveApp {
     }
 
     syncBackup() {
-        this.showToast('Syncing backup...', 'info');
+        this.showToast('Sincronizando respaldo...', 'info');
         
         // Mock sync process
         setTimeout(() => {

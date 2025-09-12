@@ -1,195 +1,195 @@
-# 🎬 Unlimited - Telegram Cloud Storage Video Platform
+# 🎬 Lat-Streaming - Plataforma de Video con Almacenamiento en la Nube de Telegram
 
-A modern, minimalist video streaming platform that uses Telegram as unlimited cloud storage backend. Stream, store, and manage your videos with a beautiful dark-themed interface.
+Una plataforma moderna y minimalista de streaming de videos que utiliza Telegram como backend de almacenamiento ilimitado en la nube. Transmite, almacena y gestiona tus videos con una hermosa interfaz de tema oscuro.
 
-![Version](https://img.shields.io/badge/version-2.0.0-green)
+![Version](https://img.shields.io/badge/versión-2.0.0-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/licencia-MIT-blue)
 
-## ✨ Features
+## ✨ Características
 
-### Core Features
-- **🚀 Unlimited Storage** - Leverage Telegram's cloud infrastructure for unlimited video storage
-- **📡 Direct Streaming** - Stream videos directly from Telegram without local storage
-- **⬆️ Smart Upload** - Automatic video upload to Telegram with progress tracking
-- **⬇️ Download Support** - Download videos from cloud storage anytime
-- **🔗 Share Links** - Generate shareable links for your videos
-- **📱 Responsive Design** - Works seamlessly on desktop and mobile devices
+### Funciones Principales
+- **🚀 Almacenamiento Ilimitado** - Aprovecha la infraestructura en la nube de Telegram para almacenamiento ilimitado de videos
+- **📡 Transmisión Directa** - Transmite videos directamente desde Telegram sin almacenamiento local
+- **⬆️ Subida Inteligente** - Subida automática de videos a Telegram con seguimiento de progreso
+- **⬇️ Soporte de Descarga** - Descarga videos desde el almacenamiento en la nube en cualquier momento
+- **🔗 Enlaces Compartidos** - Genera enlaces compartibles para tus videos
+- **📱 Diseño Responsivo** - Funciona perfectamente en dispositivos de escritorio y móviles
 
-### UI/UX Features
-- **🌑 Dark Theme** - Modern, minimalist dark interface with clean borders
-- **🎨 Clean Icons** - Custom SVG icons for better visual consistency
-- **📊 Real-time Status** - Live connection status indicator
-- **🔔 Smart Notifications** - Non-intrusive notification system
-- **⚡ Fast Loading** - Optimized performance with lazy loading
-- **🎯 Intuitive Controls** - Simple, user-friendly interface
+### Características de UI/UX
+- **🌑 Tema Oscuro** - Interfaz oscura moderna y minimalista con bordes limpios
+- **🎨 Iconos Limpios** - Iconos SVG personalizados para mejor consistencia visual
+- **📊 Estado en Tiempo Real** - Indicador de estado de conexión en vivo
+- **🔔 Notificaciones Inteligentes** - Sistema de notificaciones no intrusivo
+- **⚡ Carga Rápida** - Rendimiento optimizado con carga diferida
+- **🎯 Controles Intuitivos** - Interfaz simple y amigable para el usuario
 
-### Technical Features
-- **🔄 Auto Cleanup** - Automatic cleanup of temporary files
-- **📈 Range Requests** - Support for video seeking and partial content
-- **🛡️ Error Handling** - Graceful error recovery and fallbacks
-- **💾 Database Support** - JSON-based database for video metadata
-- **🔐 Secure Streaming** - Direct streaming with proper authentication
-- **🎞️ Multiple Formats** - Support for MP4, WebM, AVI, MKV, and more
+### Características Técnicas
+- **🔄 Limpieza Automática** - Limpieza automática de archivos temporales
+- **📈 Solicitudes de Rango** - Soporte para búsqueda de video y contenido parcial
+- **🛡️ Manejo de Errores** - Recuperación elegante de errores y respaldos
+- **💾 Soporte de Base de Datos** - Base de datos basada en JSON para metadatos de video
+- **🔐 Transmisión Segura** - Transmisión directa con autenticación adecuada
+- **🎞️ Múltiples Formatos** - Soporte para MP4, WebM, AVI, MKV y más
 
-## 🚀 Recent Updates (v2.0.0)
+## 🚀 Actualizaciones Recientes (v2.0.0)
 
-### UI Redesign
-- ✅ Complete dark theme redesign with minimalist approach
-- ✅ Removed outer borders for cleaner look
-- ✅ Improved color contrast for better visibility
-- ✅ Custom SVG icons replacing FontAwesome
-- ✅ Enhanced hover effects and animations
-- ✅ Single notification system (fixed duplicate notifications)
+### Rediseño de UI
+- ✅ Rediseño completo del tema oscuro con enfoque minimalista
+- ✅ Eliminación de bordes exteriores para un aspecto más limpio
+- ✅ Mejor contraste de colores para mejor visibilidad
+- ✅ Iconos SVG personalizados reemplazando FontAwesome
+- ✅ Efectos de hover y animaciones mejorados
+- ✅ Sistema de notificación único (corregidas notificaciones duplicadas)
 
-### Backend Improvements
-- ✅ Fixed Telegram bot configuration issues
-- ✅ Improved video streaming with proper MIME types
-- ✅ Enhanced error handling for video playback
-- ✅ Fixed video player cleanup on close
-- ✅ Improved thumbnail generation with graceful fallback
-- ✅ Added axios for better HTTP streaming
+### Mejoras del Backend
+- ✅ Corregidos problemas de configuración del bot de Telegram
+- ✅ Transmisión de video mejorada con tipos MIME apropiados
+- ✅ Manejo de errores mejorado para reproducción de video
+- ✅ Corregida limpieza del reproductor de video al cerrar
+- ✅ Generación de miniaturas mejorada con respaldo elegante
+- ✅ Agregado axios para mejor transmisión HTTP
 
-### Bug Fixes
-- ✅ Fixed "NotSupportedError" in video playback
-- ✅ Fixed backup channel configuration errors
-- ✅ Fixed button functionality and visibility
-- ✅ Fixed app initialization timing issues
-- ✅ Fixed FFmpeg thumbnail generation errors
+### Corrección de Errores
+- ✅ Corregido "NotSupportedError" en reproducción de video
+- ✅ Corregidos errores de configuración de canales de respaldo
+- ✅ Corregida funcionalidad y visibilidad de botones
+- ✅ Corregidos problemas de temporización de inicialización de la app
+- ✅ Corregidos errores de generación de miniaturas FFmpeg
 
-## 🛠️ Installation
+## 🛠️ Instalación
 
-### Prerequisites
-- Node.js (v14 or higher)
-- FFmpeg (for thumbnail generation)
-- Telegram Bot Token
+### Prerrequisitos
+- Node.js (v14 o superior)
+- FFmpeg (para generación de miniaturas)
+- Token de Bot de Telegram
 
-### Setup
+### Configuración
 
-1. **Clone the repository**
+1. **Clonar el repositorio**
 ```bash
-git clone https://github.com/friday2su/unlimited.git
-cd unlimited
+git clone https://github.com/robertfenyiner/Lat-Streaming.git
+cd Lat-Streaming
 ```
 
-2. **Install dependencies**
+2. **Instalar dependencias**
 ```bash
 npm install
 ```
 
-3. **Configure environment variables**
-Create a `.env` file in the root directory:
+3. **Configurar variables de entorno**
+Crear un archivo `.env` en el directorio raíz:
 ```env
-# Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHANNEL_ID=your_channel_id_here
+# Configuración del Bot de Telegram
+TELEGRAM_BOT_TOKEN=tu_token_del_bot_aqui
+TELEGRAM_CHANNEL_ID=tu_id_del_canal_aqui
 
-# Server Configuration
+# Configuración del Servidor
 PORT=3000
 
-# Storage Settings
-ENABLE_THUMBNAILS=true  # Set to false if FFmpeg issues occur
+# Configuraciones de Almacenamiento
+ENABLE_THUMBNAILS=true  # Establecer como false si ocurren problemas con FFmpeg
 ```
 
-4. **Create Telegram Bot**
-- Open [@BotFather](https://t.me/botfather) on Telegram
-- Create a new bot with `/newbot`
-- Copy the bot token to `.env`
-- Create a channel and add the bot as admin
-- Get channel ID and add to `.env`
+4. **Crear Bot de Telegram**
+- Abrir [@BotFather](https://t.me/botfather) en Telegram
+- Crear un nuevo bot con `/newbot`
+- Copiar el token del bot al archivo `.env`
+- Crear un canal y agregar el bot como administrador
+- Obtener el ID del canal y agregarlo al archivo `.env`
 
-5. **Start the server**
+5. **Iniciar el servidor**
 ```bash
 npm start
 ```
 
-6. **Access the platform**
-Open your browser and navigate to `http://localhost:3000`
+6. **Acceder a la plataforma**
+Abrir tu navegador y navegar a `http://localhost:3000`
 
-## 📖 Usage
+## 📖 Uso
 
-### Uploading Videos
-1. Click the "Upload" button in the header
-2. Select or drag-and-drop your video file
-3. Wait for upload to complete
-4. Video will be automatically saved to Telegram cloud
+### Subir Videos
+1. Hacer clic en el botón "Subir" en el encabezado
+2. Seleccionar o arrastrar y soltar tu archivo de video
+3. Esperar a que se complete la subida
+4. El video se guardará automáticamente en la nube de Telegram
 
-### Streaming Videos
-1. Click on any video card to start streaming
-2. Use the player controls for playback
-3. Videos stream directly from Telegram - no local storage needed
+### Transmitir Videos
+1. Hacer clic en cualquier tarjeta de video para comenzar la transmisión
+2. Usar los controles del reproductor para la reproducción
+3. Los videos se transmiten directamente desde Telegram - no se necesita almacenamiento local
 
-### Managing Videos
-- **Play** - Click the play button or video thumbnail
-- **Download** - Download video to your device
-- **Copy URL** - Get shareable link for the video
-- **Delete** - Remove video (with confirmation)
+### Gestionar Videos
+- **Reproducir** - Hacer clic en el botón de reproducción o miniatura del video
+- **Descargar** - Descargar video a tu dispositivo
+- **Copiar URL** - Obtener enlace compartible para el video
+- **Eliminar** - Remover video (con confirmación)
 
-## 🔮 Upcoming Features
+## 🔮 Próximas Características
 
-### Phase 1 - Core Enhancements
-- [ ] **Video Rename** - Rename videos after upload
-- [ ] **Search Functionality** - Search videos by name
-- [ ] **Video Categories** - Organize videos into categories
-- [ ] **Batch Upload** - Upload multiple videos at once
-- [ ] **Upload Queue** - Queue system for multiple uploads
+### Fase 1 - Mejoras Principales
+- [ ] **Renombrar Video** - Renombrar videos después de subir
+- [ ] **Funcionalidad de Búsqueda** - Buscar videos por nombre
+- [ ] **Categorías de Video** - Organizar videos en categorías
+- [ ] **Subida en Lote** - Subir múltiples videos a la vez
+- [ ] **Cola de Subida** - Sistema de cola para múltiples subidas
 
-### Phase 2 - Advanced Features
-- [ ] **Video Compression** - Automatic video compression before upload
-- [ ] **Adaptive Streaming** - HLS/DASH support for better streaming
-- [ ] **Video Transcoding** - Convert videos to different formats
-- [ ] **Subtitle Support** - Add and display subtitles
-- [ ] **Video Editor** - Basic video editing capabilities
-- [ ] **Playlist Support** - Create and manage playlists
+### Fase 2 - Características Avanzadas
+- [ ] **Compresión de Video** - Compresión automática de video antes de subir
+- [ ] **Transmisión Adaptiva** - Soporte HLS/DASH para mejor transmisión
+- [ ] **Transcodificación de Video** - Convertir videos a diferentes formatos
+- [ ] **Soporte de Subtítulos** - Agregar y mostrar subtítulos
+- [ ] **Editor de Video** - Capacidades básicas de edición de video
+- [ ] **Soporte de Listas de Reproducción** - Crear y gestionar listas de reproducción
 
-### Phase 3 - Social Features
-- [ ] **User Authentication** - Multi-user support with login
-- [ ] **Sharing System** - Advanced sharing with permissions
-- [ ] **Comments** - Add comments to videos
-- [ ] **Favorites** - Mark videos as favorites
-- [ ] **Watch History** - Track viewing history
-- [ ] **Analytics** - View count and engagement metrics
+### Fase 3 - Características Sociales
+- [ ] **Autenticación de Usuario** - Soporte multi-usuario con inicio de sesión
+- [ ] **Sistema de Compartir** - Compartir avanzado con permisos
+- [ ] **Comentarios** - Agregar comentarios a videos
+- [ ] **Favoritos** - Marcar videos como favoritos
+- [ ] **Historial de Visualización** - Rastrear historial de visualización
+- [ ] **Analíticas** - Métricas de conteo de vistas y participación
 
-### Phase 4 - Platform Features
-- [ ] **Mobile App** - Native mobile applications
-- [ ] **PWA Support** - Progressive Web App capabilities
-- [ ] **Offline Mode** - Download for offline viewing
-- [ ] **Live Streaming** - Stream live videos
-- [ ] **Multi-language** - Support for multiple languages
-- [ ] **Dark/Light Theme Toggle** - Theme switching option
+### Fase 4 - Características de Plataforma
+- [ ] **App Móvil** - Aplicaciones móviles nativas
+- [ ] **Soporte PWA** - Capacidades de Aplicación Web Progresiva
+- [ ] **Modo Offline** - Descargar para visualización offline
+- [ ] **Transmisión en Vivo** - Transmitir videos en vivo
+- [ ] **Multi-idioma** - Soporte para múltiples idiomas
+- [ ] **Alternador Tema Oscuro/Claro** - Cambio de temas
 
-### Phase 5 - Advanced Storage
-- [ ] **Multi-channel Support** - Use multiple Telegram channels
-- [ ] **Redundancy System** - Automatic backup across channels
-- [ ] **Storage Analytics** - Monitor storage usage
-- [ ] **Auto-migration** - Migrate videos between channels
-- [ ] **Compression Stats** - Show storage savings
+### Fase 5 - Almacenamiento Avanzado
+- [ ] **Soporte Multi-canal** - Usar múltiples canales de Telegram
+- [ ] **Sistema de Redundancia** - Respaldo automático entre canales
+- [ ] **Analíticas de Almacenamiento** - Monitorear uso de almacenamiento
+- [ ] **Auto-migración** - Migrar videos entre canales
+- [ ] **Estadísticas de Compresión** - Mostrar ahorros de almacenamiento
 
-## 🤝 Contributing
+## 🤝 Contribuyendo
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+¡Las contribuciones son bienvenidas! Por favor, siéntete libre de enviar un Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Hacer fork del repositorio
+2. Crear tu rama de característica (`git checkout -b feature/CaracteristicaIncreible`)
+3. Confirmar tus cambios (`git commit -m 'Agregar alguna CaracteristicaIncreible'`)
+4. Hacer push a la rama (`git push origin feature/CaracteristicaIncreible`)
+5. Abrir un Pull Request
 
-## 📝 License
+## 📝 Licencia
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
 
-## 🙏 Acknowledgments
+## 🙏 Agradecimientos
 
-- Telegram for providing unlimited cloud storage
-- Node.js community for excellent packages
-- FFmpeg for video processing capabilities
-- All contributors and users of this project
+- Telegram por proporcionar almacenamiento ilimitado en la nube
+- Comunidad de Node.js por excelentes paquetes
+- FFmpeg por capacidades de procesamiento de video
+- Todos los colaboradores y usuarios de este proyecto
 
-## 📧 Contact
+## 📧 Contacto
 
-For questions and support, please open an issue on GitHub.
+Para preguntas y soporte, por favor abre un issue en GitHub.
 
 ---
 
-**Note:** This project is for educational purposes. Please ensure you comply with Telegram's terms of service when using this platform.
+**Nota:** Este proyecto es para propósitos educativos. Por favor, asegúrate de cumplir con los términos de servicio de Telegram al usar esta plataforma.

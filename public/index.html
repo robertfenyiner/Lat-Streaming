@@ -1,51 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Cloud Storage</title>
+    <title>Lat-Streaming - Almacenamiento en la Nube</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Main Container -->
+    <!-- Contenedor Principal -->
     <div class="app-container">
-        <!-- Header Bar -->
+        <!-- Barra de Encabezado -->
         <header class="header-bar">
             <div class="telegram-status">
-                <span class="brand-text">Telegram</span>
+                <span class="brand-text">Lat-Streaming</span>
                 <div class="status-indicator" id="connectionStatus"></div>
             </div>
             <button class="upload-button" onclick="openUploadModal()">
-                Upload
+                Subir Video
             </button>
         </header>
 
-        <!-- Main Content Area -->
+        <!-- Área de Contenido Principal -->
         <main class="content-area">
-            <!-- Videos Grid -->
+            <!-- Cuadrícula de Videos -->
             <div class="videos-container" id="videosGrid">
                 <div class="loading-state" id="loadingSpinner">
                     <svg class="loading-spinner" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
                         <path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round"/>
                     </svg>
-                    <span>Loading videos...</span>
+                    <span>Cargando videos...</span>
                 </div>
             </div>
         </main>
 
-        <!-- Notification Area -->
+        <!-- Área de Notificaciones -->
         <div class="notification-area" id="notificationArea">
             <svg class="notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
-            <span class="notification-text">Notification</span>
+            <span class="notification-text">Notificación</span>
         </div>
     </div>
 
-    <!-- Upload Modal -->
+    <!-- Modal de Subida -->
     <div class="upload-modal" id="uploadModal">
         <div class="upload-content">
             <div class="upload-header">
