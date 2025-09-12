@@ -146,6 +146,9 @@ class CloudStreamingService {
             }
         });
 
+        // Capture bot reference for use inside the stream
+        const bot = this.bot;
+
         reconstructedStream.readNextChunk = async function() {
             try {
                 if (currentChunkIndex >= telegramData.chunks.length) {
@@ -155,7 +158,7 @@ class CloudStreamingService {
 
                 if (!currentChunkStream) {
                     const chunk = telegramData.chunks[currentChunkIndex];
-                    currentChunkStream = this.bot.getFileStream(chunk.fileId);
+                    currentChunkStream = bot.getFileStream(chunk.fileId);
                     
                     currentChunkStream.on('data', (data) => {
                         this.push(data);
