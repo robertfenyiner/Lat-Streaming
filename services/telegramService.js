@@ -15,7 +15,17 @@ class TelegramService {
             return;
         }
 
-        this.bot = new TelegramBot(this.botToken, { polling: false });
+        // Force IPv4 for Telegram connections
+        const botOptions = { 
+            polling: false,
+            request: {
+                agentOptions: {
+                    family: 4  // Force IPv4
+                }
+            }
+        };
+        
+        this.bot = new TelegramBot(this.botToken, botOptions);
         this.maxFileSize = 20 * 1024 * 1024; // 20MB Telegram limit for videos
         this.maxDocumentSize = 50 * 1024 * 1024; // 50MB limit for documents
         this.maxRetries = 3;
