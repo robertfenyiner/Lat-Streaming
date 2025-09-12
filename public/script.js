@@ -112,13 +112,115 @@ class StreamDriveApp {
         });
     }
 
+    getBackupStatus(video) {
+        if (video.telegramData?.uploaded) {
+            return { status: 'success', text: 'Respaldado' };
+        }
+        
+        // Check both possible uploading field locations
+        const isUploading = video.telegramData?.uploading || video["telegramData.uploading"];
+        
+        if (isUploading) {
+            const totalChunks = video.telegramData.totalChunks || 0;
+            const uploadedChunks = video.telegramData.uploadedChunks || 0;
+            
+            if (totalChunks > 0) {
+                return { 
+                    status: 'uploading', 
+                    text: `Subiendo a Telegram... (${uploadedChunks}/${totalChunks})` 
+                };
+            } else {
+                return { status: 'uploading', text: 'Subiendo a Telegram...' };
+            }
+        }
+        
+        return { status: 'error', text: 'Respaldo falló' };
+    }
+
+    startUploadProgressPolling() {
+        // Set maximum polling time (5 minutes)
+        this.uploadPollingStartTime = Date.now();
+        this.maxPollingTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+        if (this.uploadProgressInterval) {
+            clearInterval(this.uploadProgressInterval);
+        }
+        
+        this.uploadProgressInterval = setInterval(() => {
+            this.checkUploadProgress();
+        }, 3000);
+    }
+
+    stopUploadProgressPolling() {
+        if (this.uploadProgressInterval) {
+            clearInterval(this.uploadProgressInterval);
+            this.uploadProgressInterval = null;
+        }
+    }
+
+    async checkUploadProgress() {
+        try {
+        // Check if polling has exceeded maximum time
+        if (this.uploadPollingStartTime && (Date.now() - this.uploadPollingStartTime) > this.maxPollingTime) {
+            console.log("Upload polling timeout reached, stopping...");
+            this.stopUploadProgressPolling();
+            return;
+        }
+
+            const response = await fetch('/api/videos');
+            if (!response.ok) return;
+            
+            const videos = await response.json();
+            
+            videos.forEach(video => {
+                const videoCard = document.querySelector(`[data-video-id="${video.id}"]`);
+                if (videoCard) {
+                    const backupStatusEl = videoCard.querySelector('.backup-status');
+                    if (backupStatusEl) {
+                        const status = this.getBackupStatus(video);
+                        backupStatusEl.className = `backup-status ${status.status}`;
+                        backupStatusEl.textContent = status.text;
+                    }
+                }
+            });
+            
+            // Force final check after reasonable time
+            if (this.uploadPollingStartTime && (Date.now() - this.uploadPollingStartTime) > 180000) { // 3 minutes
+                console.log("Forcing final upload status check...");
+                videos.forEach(video => {
+                    if (video.telegramData?.uploaded) {
+                        const videoCard = document.querySelector(`[data-video-id="${video.id}"]`);
+                        if (videoCard) {
+                            const backupStatusEl = videoCard.querySelector(".backup-status");
+                            if (backupStatusEl && backupStatusEl.classList.contains("uploading")) {
+                                backupStatusEl.className = "backup-status success";
+                                backupStatusEl.textContent = "Respaldado";
+                            }
+                        }
+                    }
+                });
+                this.stopUploadProgressPolling();
+            }
+
+            // Si no hay videos subiendo, detener el polling
+            const hasUploading = videos.some(v => v.telegramData?.uploading || v["telegramData.uploading"]);
+            
+            // Si no hay videos subiendo, detener el polling
+            if (!hasUploading) {
+                this.stopUploadProgressPolling();
+            }
+        } catch (error) {
+            console.error('Error checking upload progress:', error);
+        }
+    }
+
     createVideoCard(video) {
         const card = document.createElement('div');
         card.className = 'video-card';
         card.dataset.videoId = video.id;
         
-        const backupStatus = video.telegramData?.uploaded ? 'success' : 'error';
-        const backupText = video.telegramData?.uploaded ? 'Respaldado' : 'Respaldo falló';
+        const status = this.getBackupStatus(video);
+        const backupStatus = status.status; const backupText = status.text;
 
         // Get cloud thumbnail URL
         const thumbnailUrl = video.cloudThumbnail 
@@ -268,6 +370,7 @@ class StreamDriveApp {
                     const response = JSON.parse(xhr.responseText);
                     this.showToast('¡Video subido exitosamente!', 'success');
                     this.loadVideos();
+                    this.startUploadProgressPolling();
                     progressText.textContent = 'Upload complete!';
                     setTimeout(() => {
                         this.closeUploadModal();
@@ -659,6 +762,32 @@ class StreamDriveApp {
         return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
     }
 
+
+    // Loading state management
+    setLoadingState(loading) {
+        const buttons = document.querySelectorAll('button');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        
+        if (loading) {
+            buttons.forEach(btn => {
+                if (!btn.classList.contains('close-btn')) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                }
+            });
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'flex';
+            }
+        } else {
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            });
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+    }
     showToast(message, type = 'info') {
         // Show in notification area only
         const notificationArea = document.getElementById('notificationArea');

@@ -18,6 +18,24 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Upload lock system to prevent parallel uploads
+const uploadLocks = new Set(); // Keep track of videos currently being uploaded
+
+function isUploadInProgress(videoId) {
+    return uploadLocks.has(videoId);
+}
+
+function startUploadLock(videoId) {
+    uploadLocks.add(videoId);
+    console.log(`🔒 Upload lock acquired for video ${videoId}`);
+}
+
+function releaseUploadLock(videoId) {
+    uploadLocks.delete(videoId);
+    console.log(`🔓 Upload lock released for video ${videoId}`);
+}
+
 app.use(express.static('public'));
 
 // Ensure directories exist (removed hls directory)
@@ -112,25 +130,27 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
         // Start upload immediately without waiting for metadata
         console.log('Uploading to Telegram cloud storage...');
         const uploadStartTime = Date.now();
+        // Check if upload is already in progress
+        if (isUploadInProgress(videoId)) {
+            return res.status(409).json({ error: "Upload already in progress for this video" });
+        }
+        startUploadLock(videoId);
+
         const uploadPromise = telegramService.uploadVideo(videoPath, finalName, videoId);
 
-        // Get basic metadata in parallel (lightweight operation)
-        const basicMetadataPromise = videoProcessor.getBasicMetadata(videoPath);
+        // Get basic metadata immediately (lightweight operation)
+        const metadata = await videoProcessor.getBasicMetadata(videoPath);
 
-        // Wait for upload to complete first (priority)
-        const telegramData = await uploadPromise;
-        const uploadTime = Date.now() - uploadStartTime;
-        console.log(`Upload completed in ${uploadTime}ms`);
-
-        // Get basic metadata
-        const metadata = await basicMetadataPromise;
-
-        // Save to database immediately with basic data
+        // Save to database immediately with PENDING status
         const videoData = {
             id: videoId,
             originalName: finalName, // Use final name (converted if needed)
             metadata: metadata,
-            telegramData: telegramData,
+            telegramData: {
+                uploaded: false,
+                uploading: true,
+                status: 'pending'
+            },
             cloudThumbnail: null, // Will be generated in background
             uploadDate: new Date().toISOString(),
             size: req.file.size,
@@ -140,16 +160,33 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
             category: null,
             shareLinks: [],
             streamingMethod: 'cloud',
-            uploadTime: uploadTime, // Track upload performance
+            uploadTime: null, // Will be updated when upload completes
             converted: videoConverter.needsConversion(originalName), // Track if file was converted
             originalFileName: originalName // Keep track of original name
         };
 
         await databaseService.saveVideo(videoData);
 
-        // Start background tasks (don't wait for them)
+        // Start background upload (don't wait for it)
+        console.log('Starting background upload to Telegram...');
+        const backgroundUploadStartTime = Date.now();
+        
         setImmediate(async () => {
+                console.log(`DEBUG: Starting Telegram upload for video ${videoId}, file: ${videoPath}`);
             try {
+                // Upload to Telegram in background
+                const telegramData = await telegramService.uploadVideo(videoPath, finalName, videoId);
+                const uploadTime = Date.now() - backgroundUploadStartTime;
+                console.log(`Background upload completed in ${uploadTime}ms`);
+
+                // Update database with Telegram data
+                await databaseService.updateVideoMetadata(videoId, {
+                    telegramData: telegramData,
+                    uploadTime: uploadTime,
+                    'telegramData.uploading': false,
+                    'telegramData.status': 'completed'
+                });
+
                 // Generate thumbnail in background
                 let cloudThumbnail = null;
                 try {
@@ -157,42 +194,50 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
                     cloudThumbnail = await cloudStreamingService.generateThumbnailFromTelegram(telegramData, videoId);
                     if (cloudThumbnail) {
                         console.log('Thumbnail generated successfully');
+                        await databaseService.updateVideoMetadata(videoId, {
+                            cloudThumbnail: cloudThumbnail
+                        });
                     } else {
                         console.log('Thumbnail generation skipped or failed - using placeholder');
                     }
                 } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                     console.log('Thumbnail generation error (non-critical):', error.message.split('\n')[0]);
-                    // Continue without thumbnail - not a critical error
-                }
-
-                // Update database with enhanced data
-                if (cloudThumbnail) {
-                    await databaseService.updateVideoMetadata(videoId, {
-                        cloudThumbnail: cloudThumbnail
-                    });
                 }
 
                 // Clean up all temporary files after processing is complete
                 console.log(`Cleaning up ${filesToCleanup.length} temporary files...`);
                 await videoConverter.cleanup(filesToCleanup);
+                releaseUploadLock(videoId);
 
             } catch (error) {
-                console.warn('Background processing failed:', error.message);
-                // Still clean up files even if background processing fails
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
+                console.error('Background upload failed:', error);
+                
+                // Update database with error status
+                await databaseService.updateVideoMetadata(videoId, {
+                    'telegramData.uploaded': false,
+                    'telegramData.uploading': false,
+                    'telegramData.status': 'failed',
+                    'telegramData.error': error.message
+                });
+
+                releaseUploadLock(videoId);
+                // Still clean up files even if upload fails
                 await videoConverter.cleanup(filesToCleanup);
             }
         });
 
         const totalTime = Date.now() - startTime;
-        console.log(`Total request processed in ${totalTime}ms (Upload: ${uploadTime}ms)`);
+        console.log(`Total request processed in ${totalTime}ms (Processing in background)`);
 
         // Return response immediately
         res.json({
             success: true,
             videoId: videoId,
             message: videoConverter.needsConversion(originalName) 
-                ? `Video converted and uploaded successfully (${originalName} -> ${finalName})`
-                : 'Video uploaded to cloud storage successfully',
+                ? `Video received - processing in background (${originalName} -> ${finalName})`
+                : 'Video received - uploading to cloud in background',
             streamUrl: `/api/stream/${videoId}`,
             cloudStreamUrl: `/api/cloud-stream/${videoId}`,
             thumbnailUrl: `/api/thumbnail/${videoId}`, // Will be available once generated
@@ -202,15 +247,13 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
             converted: videoConverter.needsConversion(originalName),
             originalFileName: originalName,
             finalFileName: finalName,
-            performance: {
-                uploadTime: uploadTime,
-                totalTime: totalTime
-            }
         });
 
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Upload error:', error);
         
+        releaseUploadLock(videoId);
         // Clean up files on error
         if (filesToCleanup.length > 0) {
             await videoConverter.cleanup(filesToCleanup).catch(err => 
@@ -263,6 +306,7 @@ app.get('/api/videos', async (req, res) => {
         console.log(`Returning ${validVideos.length} valid videos`);
         res.json(validVideos);
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Error fetching videos:', error);
         res.status(500).json({ error: error.message });
     }
@@ -279,6 +323,7 @@ app.get('/api/debug', async (req, res) => {
             sampleVideo: videos[0] || null
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -294,6 +339,7 @@ app.get('/api/video/:id', async (req, res) => {
         }
         res.json(video);
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Error fetching video:', error);
         res.status(500).json({ error: error.message });
     }
@@ -372,6 +418,7 @@ app.get('/api/stream/:id', async (req, res) => {
         });
         
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Stream error:', error);
         if (!res.headersSent) {
             res.status(500).json({ error: error.message });
@@ -412,6 +459,7 @@ app.get('/api/cloud-stream/:id', async (req, res) => {
         streamData.stream.pipe(res);
         
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Cloud stream error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -433,6 +481,7 @@ app.get('/api/thumbnail/:id', async (req, res) => {
         res.send(video.cloudThumbnail.data);
         
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Thumbnail error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -459,6 +508,7 @@ app.put('/api/video/:id/rename', async (req, res) => {
         console.log(`Video ${videoId} renamed from '${video.originalName}' to '${newName.trim()}'`);
         res.json({ success: true, message: 'Video renamed successfully', newName: newName.trim() });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Rename error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -481,6 +531,7 @@ app.delete('/api/video/:id', async (req, res) => {
                 console.log(`Video ${videoId} deleted from Telegram successfully.`);
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Failed to delete from Telegram:', error.message);
             // Continue with database deletion even if Telegram deletion fails
         }
@@ -490,6 +541,7 @@ app.delete('/api/video/:id', async (req, res) => {
 
         res.json({ success: true, message: 'Video deleted successfully' });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Delete error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -510,6 +562,7 @@ app.post('/api/video/:id/tags', async (req, res) => {
         const updatedTags = await databaseService.addVideoTags(videoId, tags);
         res.json({ success: true, tags: updatedTags });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Add tags error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -524,6 +577,7 @@ app.put('/api/video/:id/category', async (req, res) => {
         await databaseService.setVideoCategory(videoId, category);
         res.json({ success: true, category });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Set category error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -536,6 +590,7 @@ app.post('/api/video/:id/favorite', async (req, res) => {
         const favorite = await databaseService.toggleFavorite(videoId);
         res.json({ success: true, favorite });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Toggle favorite error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -548,6 +603,7 @@ app.post('/api/video/:id/view', async (req, res) => {
         const viewCount = await databaseService.incrementViewCount(videoId);
         res.json({ success: true, viewCount });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('View count error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -559,6 +615,7 @@ app.post('/api/search', async (req, res) => {
         const searchResult = await databaseService.advancedSearch(req.body);
         res.json(searchResult);
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Search error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -578,6 +635,7 @@ app.post('/api/video/:id/share', async (req, res) => {
             expiresInHours
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Share link error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -599,6 +657,7 @@ app.get('/share/:shareId', async (req, res) => {
             shareInfo: shareData.shareLink
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Shared video error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -610,6 +669,7 @@ app.get('/api/storage/health', async (req, res) => {
         const health = await telegramService.getStorageHealth();
         res.json(health);
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Storage health error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -621,6 +681,7 @@ app.get('/api/stats', async (req, res) => {
         const stats = await databaseService.getVideoStats();
         res.json(stats);
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Stats error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -644,11 +705,13 @@ app.post('/api/cleanup', async (req, res) => {
                     cleanupResults.uploads.cleaned++;
                     console.log(`Cleaned upload file: ${file}`);
                 } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                     cleanupResults.uploads.errors++;
                     console.warn(`Failed to clean upload file ${file}:`, error.message);
                 }
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Failed to read uploads directory:', error.message);
         }
 
@@ -661,11 +724,13 @@ app.post('/api/cleanup', async (req, res) => {
                     cleanupResults.temp.cleaned++;
                     console.log(`Cleaned temp file: ${file}`);
                 } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                     cleanupResults.temp.errors++;
                     console.warn(`Failed to clean temp file ${file}:`, error.message);
                 }
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Failed to read temp directory:', error.message);
         }
 
@@ -679,12 +744,14 @@ app.post('/api/cleanup', async (req, res) => {
                         cleanupResults.hls.cleaned++;
                         console.log(`Cleaned HLS file/directory: ${file}`);
                     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                         cleanupResults.hls.errors++;
                         console.warn(`Failed to clean HLS file ${file}:`, error.message);
                     }
                 }
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Failed to read hls directory:', error.message);
         }
 
@@ -698,6 +765,7 @@ app.post('/api/cleanup', async (req, res) => {
         });
 
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Cleanup error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -730,6 +798,7 @@ const performAutomaticCleanup = async () => {
                 console.log(`Auto-cleanup: Removed ${cleanedCount} old upload files`);
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Auto-cleanup uploads failed:', error.message);
         }
 
@@ -755,10 +824,12 @@ const performAutomaticCleanup = async () => {
                 console.log(`Auto-cleanup: Removed ${cleanedCount} old temp files`);
             }
         } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
             console.warn('Auto-cleanup temp failed:', error.message);
         }
         
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.warn('Automatic cleanup failed:', error.message);
     }
 };
@@ -790,6 +861,7 @@ app.post('/api/sync-telegram', async (req, res) => {
                     syncResults.valid++; // Videos without Telegram data are kept
                 }
             } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                 console.error(`Error checking video ${video.id}:`, error);
                 syncResults.errors.push({
                     videoId: video.id,
@@ -806,6 +878,7 @@ app.post('/api/sync-telegram', async (req, res) => {
             results: syncResults
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Sync error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -846,6 +919,7 @@ app.post('/api/clean-orphaned', async (req, res) => {
                     removedCount++;
                 }
             } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                 console.error(`Error checking video ${video.id}:`, error.message);
             }
         }
@@ -858,6 +932,7 @@ app.post('/api/clean-orphaned', async (req, res) => {
             totalRemoved: removedCount
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Orphan cleanup error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -888,6 +963,7 @@ app.post('/api/emergency-delete-all', async (req, res) => {
                 console.log(`Emergency deleted: ${video.originalName}`);
                 
             } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
                 console.error(`Error deleting video ${video.id}:`, error);
                 errors.push({
                     videoId: video.id,
@@ -905,6 +981,7 @@ app.post('/api/emergency-delete-all', async (req, res) => {
         });
         
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Emergency delete error:', error);
         res.status(500).json({ 
             error: 'Emergency deletion failed',
@@ -927,10 +1004,10 @@ const startServer = async () => {
         
         app.listen(PORT, () => {
             console.log(`Server running on http://localhost:${PORT}`);
-            console.log('Make sure to configure your .env file with Telegram bot credentials');
             console.log('Automatic cleanup enabled: uploads (1h), temp (30min)');
         });
     } catch (error) {
+                console.error(`DEBUG: Background upload failed for video ${videoId}:`, error.message);
         console.error('Failed to start server:', error);
         process.exit(1);
     }
