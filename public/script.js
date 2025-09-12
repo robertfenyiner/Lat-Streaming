@@ -464,6 +464,36 @@ class StreamDriveApp {
         this.currentDeleteVideoId = null;
     }
 
+    // Clean orphaned videos
+    async cleanOrphanedVideos() {
+        if (!confirm('¿Estás seguro de que quieres limpiar videos huérfanos? Esto eliminará todos los videos de la base de datos que ya no existen en Telegram.')) {
+            return;
+        }
+
+        try {
+            this.setLoadingState(true);
+            this.showToast('Iniciando limpieza de videos huérfanos...', 'info');
+            
+            const response = await fetch('/api/clean-orphaned', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showToast(`Limpieza completada: ${result.totalRemoved} videos eliminados`, 'success');
+                await this.loadVideos(); // Reload videos to update the list
+            } else {
+                const error = await response.text();
+                this.showToast(`Error en la limpieza: ${error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error cleaning orphaned videos:', error);
+            this.showToast('Error de conexión durante la limpieza', 'error');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
     // Rename Video
     showRenameModal(videoId) {
         const video = this.videos.find(v => v.id === videoId);

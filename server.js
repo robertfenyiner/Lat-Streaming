@@ -763,6 +763,58 @@ app.post('/api/sync-telegram', async (req, res) => {
     }
 });
 
+// Clean orphaned videos endpoint
+app.post('/api/clean-orphaned', async (req, res) => {
+    try {
+        console.log('Cleaning orphaned videos from database');
+        const videos = await databaseService.getAllVideos();
+        let removedCount = 0;
+        const orphanedVideos = [];
+        
+        for (const video of videos) {
+            try {
+                if (video.telegramData && video.telegramData.uploaded) {
+                    const exists = await telegramService.checkVideoExists(video.telegramData);
+                    if (!exists) {
+                        console.log(`Found orphaned video: ${video.originalName} (${video.id})`);
+                        orphanedVideos.push({
+                            id: video.id,
+                            name: video.originalName,
+                            uploadDate: video.uploadDate
+                        });
+                        await databaseService.deleteVideo(video.id);
+                        removedCount++;
+                    }
+                } else {
+                    // Videos without Telegram data are also orphaned
+                    console.log(`Found video without Telegram data: ${video.originalName} (${video.id})`);
+                    orphanedVideos.push({
+                        id: video.id,
+                        name: video.originalName,
+                        uploadDate: video.uploadDate,
+                        reason: 'No Telegram data'
+                    });
+                    await databaseService.deleteVideo(video.id);
+                    removedCount++;
+                }
+            } catch (error) {
+                console.error(`Error checking video ${video.id}:`, error.message);
+            }
+        }
+        
+        console.log(`Orphan cleanup completed: ${removedCount} videos removed`);
+        res.json({
+            success: true,
+            message: `Cleanup completed: ${removedCount} orphaned videos removed`,
+            removedVideos: orphanedVideos,
+            totalRemoved: removedCount
+        });
+    } catch (error) {
+        console.error('Orphan cleanup error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Start server
 const startServer = async () => {
     try {

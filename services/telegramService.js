@@ -16,7 +16,8 @@ class TelegramService {
         }
 
         this.bot = new TelegramBot(this.botToken, { polling: false });
-        this.maxFileSize = 50 * 1024 * 1024; // 50MB Telegram limit
+        this.maxFileSize = 20 * 1024 * 1024; // 20MB Telegram limit for videos
+        this.maxDocumentSize = 50 * 1024 * 1024; // 50MB limit for documents
         this.maxRetries = 3;
         this.retryDelay = 5000; // 5 seconds
     }
@@ -101,8 +102,8 @@ class TelegramService {
 
     async uploadLargeVideo(videoPath, originalName, videoId) {
         try {
-            // For large files, split into chunks
-            const chunkSize = 45 * 1024 * 1024; // 45MB chunks
+            // For large files, split into chunks - reduced size for better compatibility
+            const chunkSize = 15 * 1024 * 1024; // 15MB chunks for better reliability
             const chunks = await this.splitVideoFile(videoPath, chunkSize);
             const uploadedChunks = [];
 
@@ -311,8 +312,8 @@ class TelegramService {
     }
 
     async uploadLargeVideoToChannel(videoPath, originalName, videoId, checksum, channelId) {
-        // For large files, split into chunks
-        const chunkSize = 45 * 1024 * 1024; // 45MB chunks
+        // For large files, split into chunks - reduced size for better compatibility
+        const chunkSize = 15 * 1024 * 1024; // 15MB chunks for better reliability
         const chunks = await this.splitVideoFile(videoPath, chunkSize);
         const uploadedChunks = [];
 

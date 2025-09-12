@@ -76,22 +76,47 @@ body {
     50% { opacity: 0.6; }
 }
 
-.upload-button {
-    padding: 12px 35px;
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.upload-button, .sync-button {
+    padding: 12px 24px;
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: 50px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.upload-button:hover {
+.upload-button {
+    font-size: 16px;
+    padding: 12px 35px;
+}
+
+.sync-button {
+    background-color: transparent;
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.upload-button:hover, .sync-button:hover {
     background-color: var(--hover-bg);
     border-color: var(--text-primary);
     transform: translateY(-2px);
+}
+
+.sync-button:hover {
+    background-color: var(--accent-blue);
+    color: white;
 }
 
 /* Content Area */
