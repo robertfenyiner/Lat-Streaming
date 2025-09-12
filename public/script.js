@@ -563,14 +563,34 @@ class StreamDriveApp {
         }
     }
 
-    syncBackup() {
-        this.showToast('Sincronizando respaldo...', 'info');
-        
-        // Mock sync process
-        setTimeout(() => {
-            this.showToast('Backup synced successfully', 'success');
-            this.updateBackupStatus();
-        }, 2000);
+    async syncBackup() {
+        try {
+            this.showToast('Sincronizando con Telegram...', 'info');
+            
+            const response = await fetch('/api/sync-telegram', {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Error de conexión durante la sincronización');
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showToast(`Sincronización completada: ${result.results.valid} videos válidos`, 'success');
+                this.updateBackupStatus();
+                // Reload videos to show updated status
+                this.loadVideos();
+            } else {
+                throw new Error(result.message || 'Error durante la sincronización');
+            }
+            
+        } catch (error) {
+            console.error('Sync error:', error);
+            this.showToast(`Error de sincronización: ${error.message}`, 'error');
+        }
     }
 
     // Utility Functions
