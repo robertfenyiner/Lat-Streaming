@@ -193,3 +193,449 @@ Para preguntas y soporte, por favor abre un issue en GitHub.
 ---
 
 **Nota:** Este proyecto es para propósitos educativos. Por favor, asegúrate de cumplir con los términos de servicio de Telegram al usar esta plataforma.
+
+---
+
+# 🚀 Guía de Instalación Completa
+
+## 📋 Prerrequisitos del Sistema
+- **SO Recomendado**: Ubuntu 22.04.3 LTS o superior
+- **Node.js**: v14 o superior (recomendado v18 LTS)
+- **FFmpeg**: Para procesamiento de video
+- **Memoria**: Mínimo 512MB RAM disponible
+- **Espacio en Disco**: Mínimo 1GB disponible
+- **Red**: Puerto 3000 disponible (configurable)
+
+---
+
+## ⚡ Instalación Rápida (Paso a Paso)
+
+### 1️⃣ Preparar el Sistema
+
+```bash
+# Actualizar el sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar herramientas básicas
+sudo apt install -y curl wget git unzip htop nano
+
+# Crear directorio del proyecto
+sudo mkdir -p /opt/lat-streaming
+sudo chown $USER:$USER /opt/lat-streaming
+cd /opt/lat-streaming
+```
+
+### 2️⃣ Instalar Node.js 18 LTS
+
+```bash
+# Instalar NodeSource repository
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+
+# Instalar Node.js
+sudo apt install -y nodejs
+
+# Verificar instalación
+node --version  # Debe mostrar v18.x.x
+npm --version   # Debe mostrar 9.x.x o superior
+```
+
+### 3️⃣ Instalar FFmpeg
+
+```bash
+# Instalar FFmpeg para procesamiento de video
+sudo apt install -y ffmpeg
+
+# Verificar instalación
+ffmpeg -version
+```
+
+### 4️⃣ Clonar y Configurar Lat-Streaming
+
+```bash
+# Clonar el repositorio
+git clone https://github.com/robertfenyiner/Lat-Streaming.git .
+
+# Instalar dependencias
+npm install
+
+# Crear directorios necesarios
+mkdir -p uploads temp data
+```
+
+### 5️⃣ Configurar Variables de Entorno
+
+```bash
+# Crear archivo de configuración
+nano .env
+```
+
+**Contenido del archivo `.env`:**
+```env
+# Configuración del Bot de Telegram
+TELEGRAM_BOT_TOKEN=tu_token_del_bot_aqui
+TELEGRAM_CHANNEL_ID=tu_id_del_canal_aqui
+
+# Configuración del Servidor
+PORT=3000
+NODE_ENV=production
+
+# Configuraciones de Almacenamiento
+ENABLE_THUMBNAILS=true
+
+# Configuración opcional de canales de respaldo
+# TELEGRAM_BACKUP_CHANNELS=-1001234567890,-1001234567891
+
+# Configuración de FFmpeg (opcional si está en PATH)
+# FFMPEG_PATH=/usr/bin/ffmpeg
+# FFPROBE_PATH=/usr/bin/ffprobe
+```
+
+### 6️⃣ Crear Bot de Telegram
+
+1. **Crear el Bot:**
+   - Ir a [@BotFather](https://t.me/botfather) en Telegram
+   - Enviar `/newbot`
+   - Seguir las instrucciones para nombrar tu bot
+   - Copiar el token proporcionado y pegarlo en el archivo `.env`
+
+2. **Crear Canal:**
+   - Crear un canal en Telegram
+   - Agregar el bot como administrador con permisos completos
+   - Obtener el ID del canal (puedes usar [@userinfobot](https://t.me/userinfobot))
+   - Agregar el ID del canal al archivo `.env`
+
+### 7️⃣ Configurar Firewall
+
+```bash
+# Permitir puerto 3000
+sudo ufw allow 3000
+
+# Verificar reglas del firewall
+sudo ufw status
+```
+
+### 8️⃣ Instalar PM2 para Gestión de Procesos
+
+```bash
+# Instalar PM2 globalmente
+sudo npm install -g pm2
+
+# Crear archivo de configuración PM2
+nano ecosystem.config.js
+```
+
+**Contenido de `ecosystem.config.js`:**
+```javascript
+module.exports = {
+  apps: [{
+    name: 'lat-streaming',
+    script: './server.js',
+    cwd: '/opt/lat-streaming',
+    instances: 1,
+    exec_mode: 'fork',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    log_file: '/opt/lat-streaming/logs/combined.log',
+    out_file: '/opt/lat-streaming/logs/out.log',
+    error_file: '/opt/lat-streaming/logs/error.log',
+    time: true,
+    max_memory_restart: '1G',
+    restart_delay: 4000,
+    max_restarts: 10,
+    min_uptime: '10s'
+  }]
+}
+```
+
+### 9️⃣ Crear Directorio de Logs
+
+```bash
+mkdir -p logs
+```
+
+### 🔟 Iniciar la Aplicación
+
+```bash
+# Iniciar con PM2
+pm2 start ecosystem.config.js
+
+# Verificar que esté corriendo
+pm2 status
+
+# Ver logs en tiempo real
+pm2 logs lat-streaming
+
+# Configurar PM2 para auto-inicio del sistema
+pm2 startup
+pm2 save
+```
+
+---
+
+## 🌐 Configuración de Dominio (Opcional)
+
+### Con Nginx como Proxy Reverso
+
+```bash
+# Instalar Nginx
+sudo apt install -y nginx
+
+# Crear configuración del sitio
+sudo nano /etc/nginx/sites-available/lat-streaming
+```
+
+**Contenido de la configuración de Nginx:**
+```nginx
+server {
+    listen 80;
+    server_name tu-dominio.com;  # Cambiar por tu dominio
+
+    client_max_body_size 2G;  # Para archivos grandes
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+}
+```
+
+```bash
+# Activar el sitio
+sudo ln -s /etc/nginx/sites-available/lat-streaming /etc/nginx/sites-enabled/
+
+# Probar configuración
+sudo nginx -t
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+```
+
+---
+
+## 🔒 Configuración de SSL con Certbot (Opcional)
+
+```bash
+# Instalar Certbot
+sudo apt install -y certbot python3-certbot-nginx
+
+# Obtener certificado SSL gratuito
+sudo certbot --nginx -d tu-dominio.com
+
+# Verificar renovación automática
+sudo certbot renew --dry-run
+```
+
+---
+
+## 📊 Comandos de Monitoreo y Mantenimiento
+
+### Verificar Estado de la Aplicación
+```bash
+# Estado de PM2
+pm2 status
+
+# Logs en tiempo real
+pm2 logs lat-streaming --lines 100
+
+# Reiniciar aplicación
+pm2 restart lat-streaming
+
+# Recargar con cero tiempo de inactividad
+pm2 reload lat-streaming
+
+# Parar aplicación
+pm2 stop lat-streaming
+```
+
+### Monitor de Sistema
+```bash
+# Uso de recursos en tiempo real
+htop
+
+# Espacio en disco disponible
+df -h
+
+# Uso de memoria del sistema
+free -h
+
+# Procesos de Node.js activos
+ps aux | grep node
+```
+
+### Verificar Puertos y Conectividad
+```bash
+# Ver qué proceso usa el puerto 3000
+sudo netstat -tlnp | grep 3000
+
+# Alternativamente con ss
+sudo ss -tlnp | grep 3000
+
+# Probar conectividad local
+curl http://localhost:3000
+```
+
+---
+
+## 🔧 Solución de Problemas Comunes
+
+### Si la Aplicación No Inicia
+```bash
+# Verificar logs de error detallados
+pm2 logs lat-streaming --err --lines 50
+
+# Verificar versiones de Node.js
+node --version
+npm --version
+
+# Probar iniciar manualmente para debug
+cd /opt/lat-streaming
+node server.js
+```
+
+### Si FFmpeg Presenta Problemas
+```bash
+# Verificar instalación de FFmpeg
+which ffmpeg
+ffmpeg -version
+
+# Reinstalar FFmpeg si es necesario
+sudo apt remove --purge ffmpeg
+sudo apt install -y ffmpeg
+
+# Verificar permisos de archivos
+ls -la /usr/bin/ffmpeg
+```
+
+### Problemas con Telegram
+1. **Verificar token del bot** en archivo `.env`
+2. **Confirmar que el bot sea administrador** del canal
+3. **Verificar formato del ID del canal** (debe empezar con `-100`)
+4. **Probar el bot manualmente** enviando un mensaje
+
+### Liberar Espacio de Almacenamiento
+```bash
+# Limpiar logs antiguos de PM2
+pm2 flush
+
+# Limpiar archivos temporales
+cd /opt/lat-streaming
+rm -rf temp/* uploads/*
+
+# Limpiar cache de npm
+npm cache clean --force
+
+# Limpiar logs del sistema (opcional)
+sudo journalctl --vacuum-time=7d
+```
+
+---
+
+## 🚀 Acceder a tu Aplicación
+
+### Acceso Directo por IP
+```
+http://tu-ip-servidor:3000
+```
+
+### Con Nginx (Puerto 80)
+```
+http://tu-ip-servidor
+http://tu-dominio.com
+```
+
+### Con SSL Habilitado
+```
+https://tu-dominio.com
+```
+
+---
+
+## 🛡️ Consideraciones de Seguridad
+
+1. **Firewall**: Configurar UFW para permitir solo puertos necesarios
+2. **SSH**: Cambiar puerto SSH por defecto y usar autenticación por claves
+3. **Actualizaciones**: Mantener el sistema y dependencias actualizadas
+4. **Respaldos**: Configurar respaldos automáticos de la base de datos JSON
+5. **Monitoreo**: Implementar alertas de sistema y logs de acceso
+6. **Variables de Entorno**: Nunca compartir o versionar el archivo `.env`
+
+---
+
+## 📋 Checklist de Instalación
+
+### Prerrequisitos
+- [ ] ✅ Servidor Ubuntu 22.04+ preparado
+- [ ] ✅ Acceso SSH configurado
+- [ ] ✅ Usuario con permisos sudo
+
+### Instalación Base
+- [ ] ✅ Sistema actualizado
+- [ ] ✅ Node.js 18+ instalado y verificado
+- [ ] ✅ FFmpeg instalado y funcionando
+- [ ] ✅ Código clonado en `/opt/lat-streaming`
+- [ ] ✅ Dependencias npm instaladas
+
+### Configuración
+- [ ] ✅ Archivo `.env` creado y configurado
+- [ ] ✅ Bot de Telegram creado
+- [ ] ✅ Canal de Telegram configurado con bot como admin
+- [ ] ✅ IDs de bot y canal verificados
+
+### Producción
+- [ ] ✅ PM2 instalado globalmente
+- [ ] ✅ Archivo `ecosystem.config.js` configurado
+- [ ] ✅ Aplicación iniciada con PM2
+- [ ] ✅ PM2 configurado para auto-inicio
+- [ ] ✅ Firewall configurado (puerto 3000)
+
+### Opcional
+- [ ] ⚪ Nginx instalado y configurado
+- [ ] ⚪ Dominio apuntando al servidor
+- [ ] ⚪ Certificado SSL instalado
+- [ ] ⚪ Monitoreo de logs configurado
+
+---
+
+## 🆘 Soporte y Troubleshooting
+
+### Pasos de Diagnóstico
+1. **Verificar logs**: `pm2 logs lat-streaming`
+2. **Verificar estado**: `pm2 status`
+3. **Probar conectividad**: `curl http://localhost:3000`
+4. **Revisar configuración**: Verificar archivo `.env`
+5. **Verificar recursos**: `htop` y `df -h`
+
+### Comandos de Emergencia
+```bash
+# Reinicio completo de la aplicación
+pm2 restart lat-streaming
+
+# Reinicio del sistema completo
+sudo reboot
+
+# Verificar espacio en disco
+df -h
+
+# Verificar memoria disponible
+free -h
+```
+
+### Obtener Ayuda
+- Revisar logs detallados en `/opt/lat-streaming/logs/`
+- Verificar documentación de Telegram Bot API
+- Consultar documentación de PM2
+- Revisar issues en el repositorio del proyecto
+
+**¡Tu plataforma Lat-Streaming está lista para funcionar!** 🎉
