@@ -1,0 +1,692 @@
+class StreamDriveApp {
+    constructor() {
+        this.videos = [];
+        this.currentPlayer = null;
+        this.currentDeleteVideoId = null;
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadVideos();
+        this.updateBackupStatus();
+    }
+
+    setupEventListeners() {
+        // Upload modal events
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        // File input change
+        fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+
+        // Upload area events
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.uploadFile(files[0]);
+            }
+        });
+
+        // Modal close events
+        window.addEventListener('click', (e) => {
+            if (e.target.id === 'uploadModal') {
+                this.closeUploadModal();
+            }
+            if (e.target.id === 'playerModal') {
+                this.closePlayer();
+            }
+            if (e.target.id === 'renameModal') {
+                this.closeRenameModal();
+            }
+            if (e.target.id === 'deleteModal') {
+                this.closeDeleteModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeUploadModal();
+                this.closePlayer();
+                this.closeRenameModal();
+                this.closeDeleteModal();
+            }
+            // Enter key for rename modal
+            if (e.key === 'Enter' && document.getElementById('renameModal').classList.contains('show')) {
+                this.renameVideo();
+            }
+        });
+    }
+
+    // File Management
+    async loadVideos() {
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        
+        try {
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'flex';
+            }
+            const response = await fetch('/api/videos');
+            
+            if (!response.ok) {
+                throw new Error('Failed to load videos');
+            }
+
+            this.videos = await response.json();
+            this.renderVideos();
+        } catch (error) {
+            console.error('Error loading videos:', error);
+            this.showToast('Error al cargar videos', 'error');
+            this.showEmptyState('Error cargando archivos');
+        } finally {
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+    }
+
+    renderVideos() {
+        const videosGrid = document.getElementById('videosGrid');
+        
+        if (this.videos.length === 0) {
+            this.showEmptyState('Aún no hay videos subidos');
+            return;
+        }
+
+        videosGrid.innerHTML = '';
+
+        this.videos.forEach(video => {
+            const videoCard = this.createVideoCard(video);
+            videosGrid.appendChild(videoCard);
+        });
+    }
+
+    createVideoCard(video) {
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.dataset.videoId = video.id;
+        
+        const backupStatus = video.telegramData?.uploaded ? 'success' : 'error';
+        const backupText = video.telegramData?.uploaded ? 'Respaldado' : 'Respaldo falló';
+
+        // Get cloud thumbnail URL
+        const thumbnailUrl = video.cloudThumbnail 
+            ? `/api/thumbnail/${video.id}` 
+            : null;
+
+        const thumbnailHtml = thumbnailUrl 
+            ? `<img src="${thumbnailUrl}" alt="${video.originalName}" class="thumbnail-image"/>` 
+            : `<div class="no-thumbnail">
+                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                       <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                       <line x1="7" y1="2" x2="7" y2="22"/>
+                       <line x1="17" y1="2" x2="17" y2="22"/>
+                       <line x1="2" y1="12" x2="22" y2="12"/>
+                   </svg>
+               </div>`;
+
+        card.innerHTML = `
+            <div class="video-preview" onclick="app.playVideo('${video.id}')">
+                ${thumbnailHtml}
+                <div class="play-overlay">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="video-info">
+                <div class="video-title" title="${video.originalName}">
+                    ${video.originalName}
+                </div>
+                <div class="video-meta">
+                    <span class="video-size">${this.formatFileSize(video.size)}</span>
+                    <span class="backup-status ${backupStatus}">${backupText}</span>
+                </div>
+                <div class="video-actions">
+                    <button class="action-btn" onclick="app.playVideo('${video.id}')" title="Reproducir">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        <span>Reproducir</span>
+                    </button>
+                    <button class="action-btn" onclick="app.downloadVideo('${video.id}')" title="Descargar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Descargar</span>
+                    </button>
+                    <button class="action-btn" onclick="app.copyVideoUrl('${video.id}')" title="Copiar URL">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        <span>URL</span>
+                    </button>
+                    <button class="action-btn danger" onclick="app.openDeleteModal('${video.id}', '${video.originalName}')" title="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                        <span>Eliminar</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        return card;
+    }
+
+    showEmptyState(message) {
+        const videosGrid = document.getElementById('videosGrid');
+        videosGrid.innerHTML = `
+            <div class="empty-state">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                    <line x1="7" y1="2" x2="7" y2="22"/>
+                    <line x1="17" y1="2" x2="17" y2="22"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <line x1="2" y1="7" x2="7" y2="7"/>
+                    <line x1="2" y1="17" x2="7" y2="17"/>
+                    <line x1="17" y1="17" x2="22" y2="17"/>
+                    <line x1="17" y1="7" x2="22" y2="7"/>
+                </svg>
+                <h3>${message}</h3>
+                <p>Sube tu primer video para comenzar</p>
+            </div>
+        `;
+    }
+
+    // Upload Functionality
+    openUploadModal() {
+        document.getElementById('uploadModal').classList.add('show');
+    }
+
+    closeUploadModal() {
+        document.getElementById('uploadModal').classList.remove('show');
+        
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        
+        if (uploadProgress) {
+            uploadProgress.style.display = 'none';
+        }
+        if (progressFill) {
+            progressFill.style.width = '0%';
+        }
+    }
+
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            this.uploadFile(file);
+        }
+    }
+
+    async uploadFile(file) {
+        if (!this.validateFile(file)) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('video', file);
+
+        const progressContainer = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        progressContainer.style.display = 'block';
+        progressText.textContent = 'Uploading...';
+
+        try {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressFill.style.width = percentComplete + '%';
+                    progressText.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    this.showToast('¡Video subido exitosamente!', 'success');
+                    this.loadVideos();
+                    progressText.textContent = 'Upload complete!';
+                    setTimeout(() => {
+                        this.closeUploadModal();
+                    }, 2000);
+                } else {
+                    const error = JSON.parse(xhr.responseText);
+                    this.showToast(`Error de subida: ${error.error}`, 'error');
+                    progressContainer.style.display = 'none';
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                this.showToast('Error de subida: Error de red', 'error');
+                progressContainer.style.display = 'none';
+            });
+
+            xhr.open('POST', '/api/upload');
+            xhr.send(formData);
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showToast('Error de subida: ' + error.message, 'error');
+            progressContainer.style.display = 'none';
+        }
+    }
+
+    validateFile(file) {
+        const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+
+        if (!file.type.startsWith('video/')) {
+            this.showToast('Por favor selecciona un archivo de video válido', 'error');
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            this.showToast('El tamaño del archivo debe ser menor a 2GB', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    // Video Player - Fixed version
+    async playVideo(videoId) {
+        try {
+            // First get video details
+            const videoResponse = await fetch(`/api/video/${videoId}`);
+            
+            if (!videoResponse.ok) {
+                const errorData = await videoResponse.json().catch(() => ({}));
+                throw new Error(errorData.error || `Video not found (${videoResponse.status})`);
+            }
+
+            const video = await videoResponse.json();
+            const modal = document.getElementById('playerModal');
+            const playerTitle = document.getElementById('playerTitle');
+            const videoPlayer = document.getElementById('videoPlayer');
+
+            playerTitle.textContent = video.originalName;
+            
+            // Setup video player with direct stream URL
+            const streamUrl = `/api/stream/${videoId}`;
+            
+            // Clean up any existing HLS player
+            if (this.currentPlayer) {
+                this.currentPlayer.destroy();
+                this.currentPlayer = null;
+            }
+
+            // Clean up any existing error handler
+            if (this.videoErrorHandler) {
+                videoPlayer.removeEventListener('error', this.videoErrorHandler);
+                this.videoErrorHandler = null;
+            }
+
+            // Reset video player
+            videoPlayer.pause();
+            videoPlayer.src = '';
+            videoPlayer.load();
+
+            // Create new error handler that only logs real errors
+            this.videoErrorHandler = (e) => {
+                // Only handle real errors, not empty source errors
+                if (videoPlayer.src && videoPlayer.src !== '' && videoPlayer.src !== 'about:blank') {
+                    console.error('Video playback error:', e);
+                    this.showToast('Error al reproducir video: Error de transmisión', 'error');
+                }
+            };
+
+            videoPlayer.addEventListener('error', this.videoErrorHandler);
+
+            // Set the source and play
+            videoPlayer.src = streamUrl;
+            
+            modal.classList.add('show');
+            
+            // Try to play the video
+            videoPlayer.play().catch(error => {
+                console.error('Video play failed:', error);
+                this.showToast('El video no pudo iniciar la reproducción', 'error');
+            });
+            
+        } catch (error) {
+            console.error('Error playing video:', error);
+            this.showToast(`Error al reproducir video: ${error.message}`, 'error');
+        }
+    }
+
+    closePlayer() {
+        const modal = document.getElementById('playerModal');
+        const videoPlayer = document.getElementById('videoPlayer');
+        
+        // Remove error handler before clearing the source
+        if (this.videoErrorHandler) {
+            videoPlayer.removeEventListener('error', this.videoErrorHandler);
+            this.videoErrorHandler = null;
+        }
+        
+        modal.classList.remove('show');
+        videoPlayer.pause();
+        
+        // Clear source after removing event listener to avoid error events
+        videoPlayer.removeAttribute('src');
+        videoPlayer.load();
+        
+        if (this.currentPlayer) {
+            this.currentPlayer.destroy();
+            this.currentPlayer = null;
+        }
+    }
+
+    // Video Actions
+    downloadVideo(videoId) {
+        const video = this.videos.find(v => v.id === videoId);
+        if (video) {
+            // Create download link
+            const link = document.createElement('a');
+            link.href = `/api/stream/${videoId}`;
+            link.download = video.originalName;
+            link.click();
+            this.showToast('Descarga iniciada', 'success');
+        }
+    }
+
+    copyVideoUrl(videoId) {
+        const streamUrl = `${window.location.origin}/api/stream/${videoId}`;
+        
+        navigator.clipboard.writeText(streamUrl).then(() => {
+            this.showToast('URL del video copiada al portapapeles', 'success');
+        }).catch(() => {
+            this.showToast('Error al copiar URL', 'error');
+        });
+    }
+
+    // Delete Video
+    openDeleteModal(videoId, videoName) {
+        this.currentDeleteVideoId = videoId;
+        const modal = document.getElementById('deleteModal');
+        const videoNameSpan = document.getElementById('deleteVideoName');
+        
+        videoNameSpan.textContent = videoName;
+        modal.classList.add('show');
+    }
+
+    async deleteVideo() {
+        if (!this.currentDeleteVideoId) return;
+
+        try {
+            this.setLoadingState(true);
+            
+            const response = await fetch(`/api/video/${this.currentDeleteVideoId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showToast('Video eliminado correctamente', 'success');
+                this.closeDeleteModal();
+                await this.loadVideos(); // Reload videos to update the list
+            } else {
+                const error = await response.text();
+                this.showToast(`Error al eliminar video: ${error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting video:', error);
+            this.showToast('Error de conexión al eliminar video', 'error');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
+    closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('show');
+        this.currentDeleteVideoId = null;
+    }
+
+    // Clean orphaned videos
+    async cleanOrphanedVideos() {
+        if (!confirm('¿Estás seguro de que quieres limpiar videos huérfanos? Esto eliminará todos los videos de la base de datos que ya no existen en Telegram.')) {
+            return;
+        }
+
+        try {
+            this.setLoadingState(true);
+            this.showToast('Iniciando limpieza de videos huérfanos...', 'info');
+            
+            const response = await fetch('/api/clean-orphaned', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showToast(`Limpieza completada: ${result.totalRemoved} videos eliminados`, 'success');
+                await this.loadVideos(); // Reload videos to update the list
+            } else {
+                const error = await response.text();
+                this.showToast(`Error en la limpieza: ${error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error cleaning orphaned videos:', error);
+            this.showToast('Error de conexión durante la limpieza', 'error');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
+    // Rename Video
+    showRenameModal(videoId) {
+        const video = this.videos.find(v => v.id === videoId);
+        if (video) {
+            this.currentRenameVideoId = videoId;
+            const modal = document.getElementById('renameModal');
+            const input = document.getElementById('newVideoName');
+            
+            // Set current name without extension
+            const nameWithoutExt = video.originalName.replace(/\.[^/.]+$/, "");
+            input.value = nameWithoutExt;
+            
+            modal.classList.add('show');
+            input.focus();
+            input.select();
+        }
+    }
+
+    async renameVideo() {
+        const newName = document.getElementById('newVideoName').value.trim();
+        
+        if (!newName) {
+            this.showToast('Por favor ingresa un nombre válido', 'error');
+            return;
+        }
+
+        if (!this.currentRenameVideoId) return;
+
+        try {
+            const video = this.videos.find(v => v.id === this.currentRenameVideoId);
+            const originalExt = video.originalName.match(/\.[^/.]+$/)?.[0] || '';
+            const fullNewName = newName + originalExt;
+
+            const response = await fetch(`/api/video/${this.currentRenameVideoId}/rename`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ newName: fullNewName })
+            });
+
+            if (response.ok) {
+                this.showToast('Video renombrado exitosamente', 'success');
+                this.loadVideos();
+                this.closeRenameModal();
+            } else {
+                const error = await response.json();
+                this.showToast(`Error al renombrar: ${error.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Rename error:', error);
+            this.showToast('Error al renombrar video', 'error');
+        }
+    }
+
+    closeRenameModal() {
+        document.getElementById('renameModal').classList.remove('show');
+        this.currentRenameVideoId = null;
+    }
+
+    // Backup Status
+    updateBackupStatus() {
+        // Update connection status indicator for new UI
+        const statusIndicator = document.getElementById('connectionStatus');
+        if (statusIndicator) {
+            statusIndicator.style.backgroundColor = 'var(--accent-green)';
+        }
+    }
+
+    syncBackup() {
+        this.showToast('Sincronizando respaldo...', 'info');
+        
+        // Mock sync process
+        setTimeout(() => {
+            this.showToast('Backup synced successfully', 'success');
+            this.updateBackupStatus();
+        }, 2000);
+    }
+
+    // Utility Functions
+    formatFileSize(bytes) {
+        if (!bytes) return 'Unknown';
+        
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 B';
+        const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    showToast(message, type = 'info') {
+        // Show in notification area only
+        const notificationArea = document.getElementById('notificationArea');
+        if (notificationArea) {
+            const notificationText = notificationArea.querySelector('.notification-text');
+            const notificationIcon = notificationArea.querySelector('.notification-icon');
+            
+            if (notificationText) {
+                notificationText.textContent = message;
+            }
+            
+            // Update icon based on type
+            if (notificationIcon) {
+                if (type === 'success') {
+                    notificationIcon.innerHTML = `
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    `;
+                    notificationIcon.style.color = 'var(--accent-green)';
+                } else if (type === 'error') {
+                    notificationIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    `;
+                    notificationIcon.style.color = '#ff4444';
+                } else {
+                    notificationIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <circle cx="12" cy="8" r="0.5"/>
+                    `;
+                    notificationIcon.style.color = 'var(--text-secondary)';
+                }
+            }
+            
+            // Add type-specific styling
+            notificationArea.className = 'notification-area show';
+            if (type === 'success') {
+                notificationArea.style.borderColor = 'var(--accent-green)';
+            } else if (type === 'error') {
+                notificationArea.style.borderColor = '#ff4444';
+            } else {
+                notificationArea.style.borderColor = 'var(--border-color)';
+            }
+            
+            // Clear any existing timeout
+            if (this.notificationTimeout) {
+                clearTimeout(this.notificationTimeout);
+            }
+            
+            // Set new timeout
+            this.notificationTimeout = setTimeout(() => {
+                notificationArea.classList.remove('show');
+                notificationArea.style.borderColor = '';
+            }, 3000);
+        }
+    }
+
+    getToastIcon(type) {
+        const icons = {
+            success: 'check-circle',
+            error: 'exclamation-circle',
+            warning: 'exclamation-triangle',
+            info: 'info-circle'
+        };
+        return icons[type] || 'info-circle';
+    }
+}
+
+// Global app variable
+let app;
+
+// Global functions for HTML onclick events
+function openUploadModal() {
+    if (app) app.openUploadModal();
+}
+
+function closeUploadModal() {
+    if (app) app.closeUploadModal();
+}
+
+function closePlayer() {
+    if (app) app.closePlayer();
+}
+
+function syncBackup() {
+    if (app) app.syncBackup();
+}
+
+function closeRenameModal() {
+    if (app) app.closeRenameModal();
+}
+
+function closeDeleteModal() {
+    if (app) app.closeDeleteModal();
+}
+
+// Initialize app when DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        app = new StreamDriveApp();
+    });
+} else {
+    // DOM is already loaded
+    app = new StreamDriveApp();
+}

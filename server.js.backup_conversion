@@ -70,49 +70,22 @@ app.get('/', (req, res) => {
 // Upload video endpoint
 app.post('/api/upload', upload.single('video'), async (req, res) => {
     const startTime = Date.now();
-    let filesToCleanup = [];
-
+    
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No video file uploaded' });
         }
 
         const videoId = uuidv4();
-        let videoPath = req.file.path;
-        let originalName = req.file.originalname;
-        let finalName = originalName;
+        const videoPath = req.file.path;
+        const originalName = req.file.originalname;
 
         console.log(`Processing video: ${originalName}`);
-        filesToCleanup.push(videoPath);
-
-        // Check if conversion is needed
-        if (videoConverter.needsConversion(originalName)) {
-            console.log(`Converting ${originalName} to MP4...`);
-            
-            const conversionResult = await videoConverter.processUploadedFile(
-                videoPath, 
-                originalName,
-                (progress) => {
-                    console.log(`Conversion progress: ${progress.percent}%`);
-                }
-            );
-
-            if (!conversionResult.success) {
-                throw new Error(`Conversion failed: ${conversionResult.error}`);
-            }
-
-            if (conversionResult.converted) {
-                videoPath = conversionResult.finalPath;
-                finalName = conversionResult.finalFilename;
-                filesToCleanup.push(videoPath); // Add converted file to cleanup
-                console.log(`Conversion completed: ${originalName} -> ${finalName}`);
-            }
-        }
 
         // Start upload immediately without waiting for metadata
         console.log('Uploading to Telegram cloud storage...');
         const uploadStartTime = Date.now();
-        const uploadPromise = telegramService.uploadVideo(videoPath, finalName, videoId);
+        const uploadPromise = telegramService.uploadVideo(videoPath, originalName, videoId);
 
         // Get basic metadata in parallel (lightweight operation)
         const basicMetadataPromise = videoProcessor.getBasicMetadata(videoPath);
@@ -128,7 +101,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
         // Save to database immediately with basic data
         const videoData = {
             id: videoId,
-            originalName: finalName, // Use final name (converted if needed)
+            originalName: originalName,
             metadata: metadata,
             telegramData: telegramData,
             cloudThumbnail: null, // Will be generated in background
@@ -140,17 +113,15 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
             category: null,
             shareLinks: [],
             streamingMethod: 'cloud',
-            uploadTime: uploadTime, // Track upload performance
-            converted: videoConverter.needsConversion(originalName), // Track if file was converted
-            originalFileName: originalName // Keep track of original name
+            uploadTime: uploadTime // Track upload performance
         };
 
         await databaseService.saveVideo(videoData);
 
-        // Start background tasks (don't wait for them)
+        // Start background tasks (don't wait for them) - but keep file until background tasks complete
         setImmediate(async () => {
             try {
-                // Generate thumbnail in background
+                // Generate thumbnail in background (this needs the file temporarily)
                 let cloudThumbnail = null;
                 try {
                     console.log('Attempting thumbnail generation...');
@@ -172,14 +143,14 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
                     });
                 }
 
-                // Clean up all temporary files after processing is complete
-                console.log(`Cleaning up ${filesToCleanup.length} temporary files...`);
-                await videoConverter.cleanup(filesToCleanup);
-
+                // Clean up original file after all processing is complete
+                console.log(`Cleaning up local file: ${videoPath}`);
+                await fs.remove(videoPath).catch(err => console.warn('Failed to cleanup file:', err));
+                
             } catch (error) {
                 console.warn('Background processing failed:', error.message);
-                // Still clean up files even if background processing fails
-                await videoConverter.cleanup(filesToCleanup);
+                // Still clean up the file even if background processing fails
+                await fs.remove(videoPath).catch(err => console.warn('Failed to cleanup file:', err));
             }
         });
 
@@ -190,18 +161,13 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
         res.json({
             success: true,
             videoId: videoId,
-            message: videoConverter.needsConversion(originalName) 
-                ? `Video converted and uploaded successfully (${originalName} -> ${finalName})`
-                : 'Video uploaded to cloud storage successfully',
+            message: 'Video uploaded to cloud storage successfully',
             streamUrl: `/api/stream/${videoId}`,
             cloudStreamUrl: `/api/cloud-stream/${videoId}`,
             thumbnailUrl: `/api/thumbnail/${videoId}`, // Will be available once generated
             metadata: metadata,
             streamingMethod: 'cloud',
             processing: true, // Indicates background processing is ongoing
-            converted: videoConverter.needsConversion(originalName),
-            originalFileName: originalName,
-            finalFileName: finalName,
             performance: {
                 uploadTime: uploadTime,
                 totalTime: totalTime
@@ -210,18 +176,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
     } catch (error) {
         console.error('Upload error:', error);
-        
-        // Clean up files on error
-        if (filesToCleanup.length > 0) {
-            await videoConverter.cleanup(filesToCleanup).catch(err => 
-                console.warn('Error during cleanup:', err)
-            );
-        }
-
-        res.status(500).json({ 
-            error: error.message || 'Upload failed',
-            details: error.stack
-        });
+        res.status(500).json({ error: error.message });
     }
 });
 
