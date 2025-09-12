@@ -15,7 +15,17 @@ class CloudStreamingService {
             return;
         }
 
-        this.bot = new TelegramBot(this.botToken, { polling: false });
+        // Force IPv4 for Telegram connections
+        const botOptions = { 
+            polling: false,
+            request: {
+                agentOptions: {
+                    family: 4  // Force IPv4
+                }
+            }
+        };
+        
+        this.bot = new TelegramBot(this.botToken, botOptions);
     }
 
     /**
