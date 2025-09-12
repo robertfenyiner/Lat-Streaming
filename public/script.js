@@ -433,21 +433,36 @@ class StreamDriveApp {
     }
 
     async deleteVideo() {
-        if (!this.currentDeleteVideoId) return;
+        console.log('deleteVideo() called, currentDeleteVideoId:', this.currentDeleteVideoId);
+        
+        if (!this.currentDeleteVideoId) {
+            console.error('No currentDeleteVideoId set!');
+            this.showToast('Error: No se ha seleccionado un video para eliminar', 'error');
+            return;
+        }
 
         try {
+            console.log('Starting deletion process for video:', this.currentDeleteVideoId);
             this.setLoadingState(true);
-            
-            const response = await fetch(`/api/video/${this.currentDeleteVideoId}`, {
+
+            const url = `/api/video/${this.currentDeleteVideoId}`;
+            console.log('DELETE request URL:', url);
+
+            const response = await fetch(url, {
                 method: 'DELETE'
             });
 
+            console.log('Response status:', response.status, 'ok:', response.ok);
+
             if (response.ok) {
+                const result = await response.json().catch(() => ({}));
+                console.log('Delete successful:', result);
                 this.showToast('Video eliminado correctamente', 'success');
                 this.closeDeleteModal();
                 await this.loadVideos(); // Reload videos to update the list
             } else {
                 const error = await response.text();
+                console.error('Delete failed with error:', error);
                 this.showToast(`Error al eliminar video: ${error}`, 'error');
             }
         } catch (error) {
