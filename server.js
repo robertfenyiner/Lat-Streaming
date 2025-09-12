@@ -863,6 +863,56 @@ app.post('/api/clean-orphaned', async (req, res) => {
     }
 });
 
+// Emergency endpoint to delete all videos
+app.post('/api/emergency-delete-all', async (req, res) => {
+    try {
+        console.log('EMERGENCY: Deleting all videos requested');
+        const videos = await databaseService.getAllVideos();
+        
+        let deletedCount = 0;
+        let errors = [];
+        
+        for (const video of videos) {
+            try {
+                // Delete from Telegram
+                if (video.telegramData && video.telegramData.uploaded) {
+                    const deleteResult = await telegramService.deleteVideo(video.telegramData);
+                    if (deleteResult.deleted) {
+                        console.log(`Deleted from Telegram: ${video.originalName}`);
+                    }
+                }
+                
+                // Delete from database
+                await databaseService.deleteVideo(video.id);
+                deletedCount++;
+                console.log(`Emergency deleted: ${video.originalName}`);
+                
+            } catch (error) {
+                console.error(`Error deleting video ${video.id}:`, error);
+                errors.push({
+                    videoId: video.id,
+                    name: video.originalName,
+                    error: error.message
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: `Emergency deletion completed: ${deletedCount} videos deleted`,
+            deletedCount,
+            errors
+        });
+        
+    } catch (error) {
+        console.error('Emergency delete error:', error);
+        res.status(500).json({ 
+            error: 'Emergency deletion failed',
+            details: error.message 
+        });
+    }
+});
+
 // Start server
 const startServer = async () => {
     try {

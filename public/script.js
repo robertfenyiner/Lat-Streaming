@@ -509,6 +509,47 @@ class StreamDriveApp {
         }
     }
 
+    // Emergency function to delete all videos
+    async emergencyDeleteAll() {
+        if (!confirm('⚠️ EMERGENCIA: ¿Estás SEGURO de que quieres ELIMINAR TODOS LOS VIDEOS?\n\nEsto eliminará:\n- Todos los videos de la base de datos\n- Todos los archivos de Telegram\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?')) {
+            return;
+        }
+
+        if (!confirm('⚠️ CONFIRMACIÓN FINAL: Esta es tu última oportunidad.\n\n¿REALMENTE quieres eliminar TODOS los videos PERMANENTEMENTE?')) {
+            return;
+        }
+
+        try {
+            this.setLoadingState(true);
+            this.showToast('🚨 INICIANDO ELIMINACIÓN DE EMERGENCIA...', 'info');
+
+            const response = await fetch('/api/emergency-delete-all', {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Error en eliminación de emergencia');
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showToast(`✅ Eliminación completada: ${result.deletedCount} videos eliminados`, 'success');
+                // Reload videos to show empty list
+                await this.loadVideos();
+            } else {
+                throw new Error(result.message || 'Error durante eliminación de emergencia');
+            }
+
+        } catch (error) {
+            console.error('Emergency delete error:', error);
+            this.showToast(`❌ Error en eliminación de emergencia: ${error.message}`, 'error');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
     // Rename Video
     showRenameModal(videoId) {
         const video = this.videos.find(v => v.id === videoId);
