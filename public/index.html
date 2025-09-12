@@ -106,12 +106,12 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Modal de Confirmación de Eliminación -->
     <div class="delete-modal" id="deleteModal">
         <div class="delete-content">
             <div class="delete-header">
-                <h2>Delete Video</h2>
-                <button class="close-btn" onclick="closeDeleteModal()">
+                <h2>Eliminar Video</h2>
+                <button class="close-btn" onclick="app.closeDeleteModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -119,11 +119,11 @@
                 <div class="warning-icon">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
-                <h3>Are you sure?</h3>
-                <p>This will permanently delete "<span id="deleteVideoName"></span>" from your storage and Telegram backup.</p>
+                <h3>¿Estás seguro?</h3>
+                <p>Esto eliminará permanentemente "<span id="deleteVideoName"></span>" de tu almacenamiento y respaldo de Telegram.</p>
                 <div class="delete-actions">
-                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-                    <button class="btn btn-danger" onclick="app.deleteVideo()">Delete</button>
+                    <button class="btn btn-secondary" onclick="app.closeDeleteModal()">Cancelar</button>
+                    <button class="btn btn-danger" onclick="app.deleteVideo()">Eliminar</button>
                 </div>
             </div>
         </div>

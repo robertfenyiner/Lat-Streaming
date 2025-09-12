@@ -426,15 +426,15 @@ app.delete('/api/video/:id', async (req, res) => {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        // Delete from Telegram (optional - videos remain in cloud for redundancy)
+        // Delete from Telegram
         try {
             if (video.telegramData?.uploaded) {
-                console.log(`Video deleted from database. Telegram backup remains for recovery.`);
-                // Uncomment the line below to also delete from Telegram
-                // await telegramService.deleteVideo(video.telegramData);
+                await telegramService.deleteVideo(video.telegramData);
+                console.log(`Video ${videoId} deleted from Telegram successfully.`);
             }
         } catch (error) {
             console.warn('Failed to delete from Telegram:', error.message);
+            // Continue with database deletion even if Telegram deletion fails
         }
 
         // Delete from database

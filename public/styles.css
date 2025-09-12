@@ -251,6 +251,17 @@ body {
     text-overflow: ellipsis;
 }
 
+.action-btn.danger {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.action-btn.danger:hover {
+    background-color: var(--error-color);
+    color: white;
+    border-color: var(--error-color);
+}
+
 /* Loading State */
 .loading-state,
 .loading {

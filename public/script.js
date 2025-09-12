@@ -2,6 +2,7 @@ class StreamDriveApp {
     constructor() {
         this.videos = [];
         this.currentPlayer = null;
+        this.currentDeleteVideoId = null;
         this.init();
     }
 
@@ -173,6 +174,15 @@ class StreamDriveApp {
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                         </svg>
                         <span>URL</span>
+                    </button>
+                    <button class="action-btn danger" onclick="app.openDeleteModal('${video.id}', '${video.originalName}')" title="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                        <span>Eliminar</span>
                     </button>
                 </div>
             </div>
@@ -412,6 +422,48 @@ class StreamDriveApp {
         });
     }
 
+    // Delete Video
+    openDeleteModal(videoId, videoName) {
+        this.currentDeleteVideoId = videoId;
+        const modal = document.getElementById('deleteModal');
+        const videoNameSpan = document.getElementById('deleteVideoName');
+        
+        videoNameSpan.textContent = videoName;
+        modal.classList.add('show');
+    }
+
+    async deleteVideo() {
+        if (!this.currentDeleteVideoId) return;
+
+        try {
+            this.setLoadingState(true);
+            
+            const response = await fetch(`/api/video/${this.currentDeleteVideoId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showToast('Video eliminado correctamente', 'success');
+                this.closeDeleteModal();
+                await this.loadVideos(); // Reload videos to update the list
+            } else {
+                const error = await response.text();
+                this.showToast(`Error al eliminar video: ${error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting video:', error);
+            this.showToast('Error de conexión al eliminar video', 'error');
+        } finally {
+            this.setLoadingState(false);
+        }
+    }
+
+    closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('show');
+        this.currentDeleteVideoId = null;
+    }
+
     // Rename Video
     showRenameModal(videoId) {
         const video = this.videos.find(v => v.id === videoId);
@@ -470,46 +522,6 @@ class StreamDriveApp {
     closeRenameModal() {
         document.getElementById('renameModal').classList.remove('show');
         this.currentRenameVideoId = null;
-    }
-
-    // Delete Video
-    confirmDelete(videoId) {
-        const video = this.videos.find(v => v.id === videoId);
-        if (video) {
-            this.currentDeleteVideoId = videoId;
-            const modal = document.getElementById('deleteModal');
-            const videoNameSpan = document.getElementById('deleteVideoName');
-            
-            videoNameSpan.textContent = video.originalName;
-            modal.classList.add('show');
-        }
-    }
-
-    async deleteVideo() {
-        if (!this.currentDeleteVideoId) return;
-
-        try {
-            const response = await fetch(`/api/video/${this.currentDeleteVideoId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                this.showToast('Video eliminado exitosamente', 'success');
-                this.loadVideos();
-                this.closeDeleteModal();
-            } else {
-                const error = await response.json();
-                this.showToast(`Error al eliminar: ${error.error}`, 'error');
-            }
-        } catch (error) {
-            console.error('Delete error:', error);
-            this.showToast('Error al eliminar video', 'error');
-        }
-    }
-
-    closeDeleteModal() {
-        document.getElementById('deleteModal').classList.remove('show');
-        this.currentDeleteVideoId = null;
     }
 
     // Backup Status
