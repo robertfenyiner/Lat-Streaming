@@ -177,12 +177,43 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
     }
 });
 
-// Get video list
+// Get video list (with Telegram existence validation)
 app.get('/api/videos', async (req, res) => {
     try {
         const videos = await databaseService.getAllVideos();
         console.log(`Found ${videos.length} videos in database`);
-        res.json(videos);
+        
+        // Validar existencia en Telegram y filtrar videos inexistentes
+        const validVideos = [];
+        const videosToDelete = [];
+        
+        for (const video of videos) {
+            if (video.telegramData && video.telegramData.uploaded) {
+                // Verificar si el video aún existe en Telegram
+                const exists = await telegramService.checkVideoExists(video.telegramData);
+                if (exists) {
+                    validVideos.push(video);
+                } else {
+                    console.log(`Video ${video.id} (${video.originalName}) no longer exists in Telegram, removing from database`);
+                    videosToDelete.push(video.id);
+                }
+            } else {
+                // Videos sin datos de Telegram (posiblemente corruptos)
+                validVideos.push(video);
+            }
+        }
+        
+        // Eliminar videos que ya no existen en Telegram
+        for (const videoId of videosToDelete) {
+            await databaseService.deleteVideo(videoId);
+        }
+        
+        if (videosToDelete.length > 0) {
+            console.log(`Cleaned up ${videosToDelete.length} orphaned videos from database`);
+        }
+        
+        console.log(`Returning ${validVideos.length} valid videos`);
+        res.json(validVideos);
     } catch (error) {
         console.error('Error fetching videos:', error);
         res.status(500).json({ error: error.message });
@@ -235,6 +266,14 @@ app.get('/api/stream/:id', async (req, res) => {
         if (!video.telegramData?.uploaded) {
             console.log(`Video not uploaded to Telegram: ${videoId}`);
             return res.status(404).json({ error: 'Video not available for streaming' });
+        }
+
+        // Verificar si el video aún existe en Telegram
+        const exists = await telegramService.checkVideoExists(video.telegramData);
+        if (!exists) {
+            console.log(`Video ${videoId} no longer exists in Telegram, removing from database`);
+            await databaseService.deleteVideo(videoId);
+            return res.status(404).json({ error: 'Video no longer available - removed from storage' });
         }
 
         console.log(`Video found: ${video.originalName}, Telegram data:`, video.telegramData);
@@ -675,6 +714,54 @@ const performAutomaticCleanup = async () => {
         console.warn('Automatic cleanup failed:', error.message);
     }
 };
+
+// Manual sync endpoint - force synchronization with Telegram
+app.post('/api/sync-telegram', async (req, res) => {
+    try {
+        console.log('Manual Telegram synchronization requested');
+        const videos = await databaseService.getAllVideos();
+        const syncResults = {
+            total: videos.length,
+            valid: 0,
+            removed: 0,
+            errors: []
+        };
+        
+        for (const video of videos) {
+            try {
+                if (video.telegramData && video.telegramData.uploaded) {
+                    const exists = await telegramService.checkVideoExists(video.telegramData);
+                    if (exists) {
+                        syncResults.valid++;
+                    } else {
+                        console.log(`Removing orphaned video: ${video.originalName} (${video.id})`);
+                        await databaseService.deleteVideo(video.id);
+                        syncResults.removed++;
+                    }
+                } else {
+                    syncResults.valid++; // Videos without Telegram data are kept
+                }
+            } catch (error) {
+                console.error(`Error checking video ${video.id}:`, error);
+                syncResults.errors.push({
+                    videoId: video.id,
+                    videoName: video.originalName,
+                    error: error.message
+                });
+            }
+        }
+        
+        console.log(`Sync completed: ${syncResults.valid} valid, ${syncResults.removed} removed, ${syncResults.errors.length} errors`);
+        res.json({
+            success: true,
+            message: 'Synchronization completed',
+            results: syncResults
+        });
+    } catch (error) {
+        console.error('Sync error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Start server
 const startServer = async () => {

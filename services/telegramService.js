@@ -410,6 +410,42 @@ class TelegramService {
         }
     }
 
+    // Método para verificar si un video aún existe en Telegram
+    async checkVideoExists(telegramData) {
+        if (!this.bot || !telegramData || !telegramData.uploaded) {
+            return false;
+        }
+
+        try {
+            if (telegramData.uploadMethod === 'single') {
+                // Verificar si el mensaje aún existe
+                try {
+                    await this.bot.getFile(telegramData.fileId);
+                    return true;
+                } catch (error) {
+                    console.log(`Video ${telegramData.fileId} no longer exists in Telegram:`, error.message);
+                    return false;
+                }
+            } else if (telegramData.uploadMethod === 'chunked') {
+                // Verificar si todos los chunks aún existen
+                for (const chunk of telegramData.chunks) {
+                    try {
+                        await this.bot.getFile(chunk.fileId);
+                    } catch (error) {
+                        console.log(`Chunk ${chunk.fileId} no longer exists in Telegram:`, error.message);
+                        return false;
+                    }
+                }
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Error checking video existence:', error);
+            return false;
+        }
+    }
+
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

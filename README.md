@@ -249,13 +249,31 @@ sudo apt install -y ffmpeg
 ffmpeg -version
 ```
 
+### 3.5️⃣ Solucionar Problemas de IPv6 (Común en VPS)
+
+Si experimentas errores `ENETUNREACH` durante `npm install`, es probable que tu VPS tenga problemas de conectividad IPv6:
+
+```bash
+# Deshabilitar IPv6 temporalmente (soluciona problemas de npm)
+echo 'net.ipv6.conf.all.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.default.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.lo.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+
+# Aplicar cambios
+sudo sysctl -p
+
+# Configurar npm para usar solo IPv4
+npm config set ipv6 false
+npm config set prefer-online true
+```
+
 ### 4️⃣ Clonar y Configurar Lat-Streaming
 
 ```bash
 # Clonar el repositorio
 git clone https://github.com/robertfenyiner/Lat-Streaming.git .
 
-# Instalar dependencias
+# Instalar dependencias (si falla por IPv6, aplicar solución anterior)
 npm install
 
 # Crear directorios necesarios
@@ -516,6 +534,29 @@ sudo apt install -y ffmpeg
 
 # Verificar permisos de archivos
 ls -la /usr/bin/ffmpeg
+```
+
+### Problemas de Conectividad IPv6 (npm install falla)
+Si `npm install` falla con errores `ENETUNREACH`, es un problema común en VPS:
+
+```bash
+# Verificar si es problema IPv6
+ping registry.npmjs.org  # Si falla pero ping 8.8.8.8 funciona
+
+# Solución: Deshabilitar IPv6
+echo 'net.ipv6.conf.all.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.default.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.lo.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+
+# Configurar npm para IPv4 únicamente
+npm config set ipv6 false
+npm config set prefer-online true
+
+# Limpiar e intentar nuevamente
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
 ```
 
 ### Problemas con Telegram
