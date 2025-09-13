@@ -403,10 +403,15 @@ class StreamDriveApp {
         // Extensiones permitidas (incluyendo formatos que se pueden convertir)
         const allowedExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ogv', '.m4v'];
         const fileName = file.name.toLowerCase();
-        const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+        const fileExtension = fileName.substring(fileName.lastIndexOf("."));
         
         // Validar por tipo MIME o extensión
-        const isValidType = file.type.startsWith('video/') || allowedExtensions.includes(fileExtension);
+        console.log("Validating file:", fileName, "Type:", file.type, "Extension:", fileExtension);
+
+        // Validar primero por extensión, luego por MIME type
+        const isValidExtension = allowedExtensions.includes(fileExtension);
+        const isValidMimeType = file.type.startsWith("video/");
+        const isValidType = isValidExtension || isValidMimeType;
         
         if (!isValidType) {
             this.showToast(`Formato no soportado. Formatos permitidos: ${allowedExtensions.join(', ')}`, 'error');
