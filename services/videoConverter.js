@@ -65,7 +65,8 @@ class VideoConverter {
      */
     needsConversion(filename) {
         const ext = path.extname(filename).toLowerCase();
-        return ['.mkv', '.avi', '.mov', '.wmv', '.flv'].includes(ext);
+        // MKV is now supported for direct streaming - no conversion needed
+        return ['.avi', '.mov', '.wmv', '.flv'].includes(ext);
     }
 
     /**
