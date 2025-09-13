@@ -14,21 +14,15 @@ class TelegramService {
             this.bot = null;
             return;
         }
-        // Force IPv4 for Telegram connections with better timeout handling
+
+        // Force IPv4 for Telegram connections
         const botOptions = { 
             polling: false,
             request: {
                 agentOptions: {
-                    family: 4,  // Force IPv4
-                    timeout: 30000  // 30 second timeout
-                },
-                timeout: 30000,  // 30 second request timeout
-                forever: true,   // Keep connections alive
-                pool: {
-                    maxSockets: 10
+                    family: 4  // Force IPv4
                 }
-            },
-            onlyFirstMatch: true
+            }
         };
         
         this.bot = new TelegramBot(this.botToken, botOptions);
@@ -116,25 +110,67 @@ class TelegramService {
         }
     }
 
+    async uploadLargeVideo(videoPath, originalName, videoId) {
+        try {
+            // For large files, split into chunks - reduced size for better compatibility
+            const chunkSize = 15 * 1024 * 1024; // 15MB chunks for better reliability
+            const chunks = await this.splitVideoFile(videoPath, chunkSize);
+            const uploadedChunks = [];
+
+            for (let i = 0; i < chunks.length; i++) {
+                const chunkPath = chunks[i];
+                const caption = `📹 ${originalName} (Part ${i + 1}/${chunks.length})\n🆔 ${videoId}\n📅 ${new Date().toLocaleString()}`;
+                
+                const result = await this.bot.sendDocument(this.channelId, chunkPath, {
+                    caption: caption
+                });
+
+                // Add delay between chunks to avoid rate limiting
+                if (i < chunks.length - 1) {
+                    console.log(`Waiting 3 seconds before next chunk...`);
+                    await this.sleep(3000);
+                }
+
+                uploadedChunks.push({
+                    part: i + 1,
+                    messageId: result.message_id,
+                    fileId: result.document.file_id,
+                    fileUniqueId: result.document.file_unique_id,
+                    size: result.document.file_size
+                });
+
+                // Clean up chunk file
+                await fs.remove(chunkPath);
+            }
+
+            return {
+                uploaded: true,
+                uploadMethod: 'chunked',
+                totalChunks: chunks.length,
+                chunks: uploadedChunks
+            };
+        } catch (error) {
+            console.error('Large video upload error:', error);
+            throw error;
+        }
+    }
+
     async splitVideoFile(videoPath, chunkSize) {
         const chunks = [];
         const fileSize = (await fs.stat(videoPath)).size;
         const numChunks = Math.ceil(fileSize / chunkSize);
-
+        
         const tempDir = path.join(__dirname, '..', 'temp');
         await fs.ensureDir(tempDir);
 
-        // Generate unique chunk prefix using timestamp and random number
-        const uniqueId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-
         for (let i = 0; i < numChunks; i++) {
-            const chunkPath = path.join(tempDir, `chunk_${uniqueId}_${i}.bin`);
+            const chunkPath = path.join(tempDir, `chunk_${i}.bin`);
             const start = i * chunkSize;
             const end = Math.min(start + chunkSize, fileSize);
-
+            
             const readStream = fs.createReadStream(videoPath, { start, end: end - 1 });
             const writeStream = fs.createWriteStream(chunkPath);
-
+            
             await new Promise((resolve, reject) => {
                 readStream.pipe(writeStream);
                 writeStream.on('finish', resolve);
@@ -144,7 +180,6 @@ class TelegramService {
             chunks.push(chunkPath);
         }
 
-        console.log(`📦 Created ${numChunks} unique chunks with ID: ${uniqueId}`);
         return chunks;
     }
 
@@ -300,66 +335,19 @@ class TelegramService {
 
         for (let i = 0; i < chunks.length; i++) {
             const chunkPath = chunks[i];
-            const caption = checksum ?
+            const caption = checksum ? 
                 `📹 ${originalName} (Part ${i + 1}/${chunks.length})\n🆔 ${videoId}\n📅 ${new Date().toLocaleString()}\n🔐 ${checksum.substring(0, 16)}...` :
                 `📹 ${originalName} (Part ${i + 1}/${chunks.length})\n🆔 ${videoId}\n📅 ${new Date().toLocaleString()}`;
+            
+            const result = await this.bot.sendDocument(channelId, chunkPath, {
+                caption: caption
+            });
 
-            let retryCount = 0;
-            const maxRetries = 3;
-            let success = false;
-            let result;
-
-            while (!success && retryCount < maxRetries) {
-                    // Debug: verify chunk file exists
-                    console.log(`🔍 Attempting to send chunk: ${chunkPath}`);
-                    const chunkExists = await fs.pathExists(chunkPath);
-                    console.log(`📁 Chunk exists: ${chunkExists}`);
-                    if (!chunkExists) {
-                        throw new Error(`Chunk file not found: ${chunkPath}`);
-                    }
-
-                try {
-                    result = await this.bot.sendDocument(channelId, chunkPath, {
-                        caption: caption
-                    });
-                    success = true;
-                    
-                    console.log(`✅ Chunk ${i + 1}/${chunks.length} uploaded successfully`);
-                    
-                } catch (error) {
-                    retryCount++;
-                    console.error(`❌ Error uploading chunk ${i + 1}/${chunks.length}, attempt ${retryCount}:`, error.message);
-                    
-                    // Handle 429 errors specifically
-                    if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
-                        // Extract retry-after time from error message
-                        const retryAfterMatch = error.message.match(/retry after (\d+)/);
-                        const retryAfter = retryAfterMatch ? parseInt(retryAfterMatch[1]) : 10;
-                        
-                        console.log(`⏳ Rate limited. Waiting ${retryAfter} seconds before retry...`);
-                        await this.sleep(retryAfter * 1000);
-                    } else {
-                        // For other errors, wait a shorter time
-                        await this.sleep(3000);
-                    }
-                    
-                    // If max retries reached, throw error to stop the upload
-                    if (retryCount >= maxRetries) {
-                        console.error(`💥 Failed to upload chunk ${i + 1}/${chunks.length} after ${maxRetries} attempts`);
-                        
-                        // Clean up remaining chunk files
-                        for (let j = i; j < chunks.length; j++) {
-                            try {
-                                await fs.remove(chunks[j]);
-                            } catch (cleanupError) {
-                                console.warn('Error cleaning up chunk:', cleanupError.message);
-                            }
-                        }
-                        
-                        throw new Error(`ETELEGRAM: ${error.message}`);
-                    }
+                // Add delay between chunks to avoid rate limiting
+                if (i < chunks.length - 1) {
+                    console.log(`Waiting 3 seconds before next chunk...`);
+                    await this.sleep(3000);
                 }
-            }
 
             uploadedChunks.push({
                 part: i + 1,
@@ -371,12 +359,6 @@ class TelegramService {
 
             // Clean up chunk file
             await fs.remove(chunkPath);
-            
-            // Add delay between chunks to avoid rate limiting
-            if (i < chunks.length - 1) {
-                console.log(`⏸️ Waiting 3 seconds before next chunk...`);
-                await this.sleep(3000);
-            }
         }
 
         return {
@@ -388,6 +370,7 @@ class TelegramService {
             checksum: checksum
         };
     }
+
     async verifyUpload(telegramData, originalChecksum) {
         if (!telegramData.uploaded || !originalChecksum) {
             return { verified: false, reason: 'Upload data or checksum missing' };

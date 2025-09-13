@@ -117,10 +117,7 @@ class StreamDriveApp {
             return { status: 'success', text: 'Respaldado' };
         }
         
-        // Check both possible uploading field locations
-        const isUploading = video.telegramData?.uploading || video["telegramData.uploading"];
-        
-        if (isUploading) {
+        if (video.telegramData?.uploading) {
             const totalChunks = video.telegramData.totalChunks || 0;
             const uploadedChunks = video.telegramData.uploadedChunks || 0;
             
@@ -138,10 +135,6 @@ class StreamDriveApp {
     }
 
     startUploadProgressPolling() {
-        // Set maximum polling time (5 minutes)
-        this.uploadPollingStartTime = Date.now();
-        this.maxPollingTime = 5 * 60 * 1000; // 5 minutes in milliseconds
-
         if (this.uploadProgressInterval) {
             clearInterval(this.uploadProgressInterval);
         }
@@ -160,13 +153,6 @@ class StreamDriveApp {
 
     async checkUploadProgress() {
         try {
-        // Check if polling has exceeded maximum time
-        if (this.uploadPollingStartTime && (Date.now() - this.uploadPollingStartTime) > this.maxPollingTime) {
-            console.log("Upload polling timeout reached, stopping...");
-            this.stopUploadProgressPolling();
-            return;
-        }
-
             const response = await fetch('/api/videos');
             if (!response.ok) return;
             
@@ -184,28 +170,8 @@ class StreamDriveApp {
                 }
             });
             
-            // Force final check after reasonable time
-            if (this.uploadPollingStartTime && (Date.now() - this.uploadPollingStartTime) > 180000) { // 3 minutes
-                console.log("Forcing final upload status check...");
-                videos.forEach(video => {
-                    if (video.telegramData?.uploaded) {
-                        const videoCard = document.querySelector(`[data-video-id="${video.id}"]`);
-                        if (videoCard) {
-                            const backupStatusEl = videoCard.querySelector(".backup-status");
-                            if (backupStatusEl && backupStatusEl.classList.contains("uploading")) {
-                                backupStatusEl.className = "backup-status success";
-                                backupStatusEl.textContent = "Respaldado";
-                            }
-                        }
-                    }
-                });
-                this.stopUploadProgressPolling();
-            }
-
             // Si no hay videos subiendo, detener el polling
-            const hasUploading = videos.some(v => v.telegramData?.uploading || v["telegramData.uploading"]);
-            
-            // Si no hay videos subiendo, detener el polling
+            const hasUploading = videos.some(v => v.telegramData?.uploading);
             if (!hasUploading) {
                 this.stopUploadProgressPolling();
             }
@@ -399,29 +365,15 @@ class StreamDriveApp {
 
     validateFile(file) {
         const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
-        
-        // Extensiones permitidas (incluyendo formatos que se pueden convertir)
-        const allowedExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ogv', '.m4v'];
-        const fileName = file.name.toLowerCase();
-        const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
-        
-        // Validar por tipo MIME o extensión
-        const isValidType = file.type.startsWith('video/') || allowedExtensions.includes(fileExtension);
-        
-        if (!isValidType) {
-            this.showToast(`Formato no soportado. Formatos permitidos: ${allowedExtensions.join(', ')}`, 'error');
+
+        if (!file.type.startsWith('video/')) {
+            this.showToast('Por favor selecciona un archivo de video válido', 'error');
             return false;
         }
 
         if (file.size > maxSize) {
             this.showToast('El tamaño del archivo debe ser menor a 2GB', 'error');
             return false;
-        }
-
-        // Mostrar mensaje si el archivo necesitará conversión
-        const needsConversion = ['.mkv', '.avi', '.mov', '.wmv', '.flv'].includes(fileExtension);
-        if (needsConversion) {
-            this.showToast(`Archivo ${fileExtension.toUpperCase()} detectado - se convertirá a MP4 automáticamente`, 'info');
         }
 
         return true;

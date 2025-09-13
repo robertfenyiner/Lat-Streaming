@@ -14,21 +14,15 @@ class TelegramService {
             this.bot = null;
             return;
         }
-        // Force IPv4 for Telegram connections with better timeout handling
+
+        // Force IPv4 for Telegram connections
         const botOptions = { 
             polling: false,
             request: {
                 agentOptions: {
-                    family: 4,  // Force IPv4
-                    timeout: 30000  // 30 second timeout
-                },
-                timeout: 30000,  // 30 second request timeout
-                forever: true,   // Keep connections alive
-                pool: {
-                    maxSockets: 10
+                    family: 4  // Force IPv4
                 }
-            },
-            onlyFirstMatch: true
+            }
         };
         
         this.bot = new TelegramBot(this.botToken, botOptions);
@@ -120,7 +114,7 @@ class TelegramService {
         const chunks = [];
         const fileSize = (await fs.stat(videoPath)).size;
         const numChunks = Math.ceil(fileSize / chunkSize);
-
+        
         const tempDir = path.join(__dirname, '..', 'temp');
         await fs.ensureDir(tempDir);
 
@@ -128,13 +122,13 @@ class TelegramService {
         const uniqueId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
 
         for (let i = 0; i < numChunks; i++) {
+        // Generate unique chunk prefix using timestamp and random number
             const chunkPath = path.join(tempDir, `chunk_${uniqueId}_${i}.bin`);
-            const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, fileSize);
-
+            
             const readStream = fs.createReadStream(videoPath, { start, end: end - 1 });
             const writeStream = fs.createWriteStream(chunkPath);
-
+            const end = Math.min(start + chunkSize, fileSize);
+            
             await new Promise((resolve, reject) => {
                 readStream.pipe(writeStream);
                 writeStream.on('finish', resolve);
@@ -143,8 +137,9 @@ class TelegramService {
 
             chunks.push(chunkPath);
         }
-
         console.log(`📦 Created ${numChunks} unique chunks with ID: ${uniqueId}`);
+
+
         return chunks;
     }
 
