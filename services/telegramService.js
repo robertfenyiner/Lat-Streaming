@@ -293,8 +293,8 @@ class TelegramService {
     }
 
     async uploadLargeVideoToChannel(videoPath, originalName, videoId, checksum, channelId) {
-        // For large files, split into chunks - reduced size for better compatibility
-        const chunkSize = 15 * 1024 * 1024; // 15MB chunks for better reliability
+        // For large files, split into chunks - optimized for Telegram 50MB limit
+        const chunkSize = 45 * 1024 * 1024; // 45MB chunks (within 50MB Telegram limit)
         const chunks = await this.splitVideoFile(videoPath, chunkSize);
         const uploadedChunks = [];
 
@@ -372,10 +372,10 @@ class TelegramService {
             // Clean up chunk file
             await fs.remove(chunkPath);
             
-            // Add delay between chunks to avoid rate limiting
+            // Add delay between chunks to avoid rate limiting (Telegram: max 1 msg/sec)
             if (i < chunks.length - 1) {
-                console.log(`⏸️ Waiting 3 seconds before next chunk...`);
-                await this.sleep(3000);
+                console.log(`⏸️ Waiting 1.2 seconds before next chunk...`);
+                await this.sleep(1200);
             }
         }
 
