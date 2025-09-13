@@ -398,7 +398,7 @@ class StreamDriveApp {
     }
 
     validateFile(file) {
-        const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+        const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
         
         // Extensiones permitidas (incluyendo formatos que se pueden convertir)
         const allowedExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ogv', '.m4v'];
@@ -419,7 +419,7 @@ class StreamDriveApp {
         }
 
         if (file.size > maxSize) {
-            this.showToast('El tamaño del archivo debe ser menor a 2GB', 'error');
+            this.showToast('El tamaño del archivo debe ser menor a 5GB', 'error');
             return false;
         }
 
